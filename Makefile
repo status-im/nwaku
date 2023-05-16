@@ -308,3 +308,106 @@ cwaku_example: | build cbindings
 		vendor/nim-libbacktrace/install/usr/lib/libbacktrace.a
 
 endif # "variables.mk" was not included
+
+##############################################
+# Static Binaries for Multiple Architectures #
+##############################################
+
+MAKE_PID := $(shell echo $$PPID)
+JOB_FLAG := $(filter -j%, $(subst --jobs ,-j,$(subst --jobs=,-j,$(subst -j ,-j,$(shell ps T | grep "^\s*$(MAKE_PID).*$(MAKE)")))))
+JOBS := $(subst -j,,$(JOB_FLAG))
+ifneq ($(JOBS), )
+	JOBS := -j $(JOBS)
+endif
+
+ARCH :=amd64
+#FIXME!
+NWAKU_BUILDER_IMAGE := quay.io/vpavlin0/nwaku-builder
+NWAKU_BASE_TAG := 20230512110759
+NWAKU_DIST_TAG := $(GIT_VERSION)_
+#nwaku-base-20230502082624_arm64
+
+SHELL := /bin/bash
+
+BINARIES := wakunode2 wakunode1 chat2
+
+static-base: 
+	set -x &&\
+	mkdir -p $${PWD}/vendor-$(ARCH) $${PWD}/build/$(ARCH) $${PWD}/nimcache-$(ARCH) &&\
+	docker run -it --rm\
+	 -v $${PWD}:/home/user/nwaku:z\
+	 -v $${PWD}/vendor-$(ARCH):/home/user/nwaku/vendor:z\
+	 -v $${PWD}/nimcache-$(ARCH):/home/user/nwaku/nimcache:z\
+	 -v $${PWD}/build/$(ARCH):/home/user/nwaku/build:z\
+	 --workdir /home/user/nwaku\
+	 --user $$(id -u):$$(id -g)\
+	 $(NWAKU_BUILDER_IMAGE):$(NWAKU_BASE_TAG)_$(ARCH)\
+	 	$(JOBS)\
+	 	V=1\
+	 	LOG_LEVEL="TRACE"\
+	 	QUICK_AND_DIRTY_COMPILER=1\
+		NIMFLAGS="$(NIMFLAGS)"\
+		$(BINARIES)
+
+static-arm64: ARCH :=arm64
+static-arm64: NIMFLAGS := $(NIMFLAGS) --cpu:arm64 --os:linux --gcc.exe:aarch64-alpine-linux-musl-gcc --gcc.linkerexe:aarch64-alpine-linux-musl-gcc --passL:-static
+static-arm64:
+	$(MAKE) $(JOBS) static-base NIMFLAGS="$(NIMFLAGS)" ARCH=$(ARCH)
+
+
+
+static-amd64: ARCH :=amd64
+static-amd64: NIMFLAGS := $(NIMFLAGS) --cpu:amd64 --os:linux --gcc.exe:x86_64-alpine-linux-musl-gcc --gcc.linkerexe:x86_64-alpine-linux-musl-gcc --passL:-static
+static-amd64:
+	$(MAKE) $(JOBS) static-base NIMFLAGS="$(NIMFLAGS)" ARCH=$(ARCH)
+
+static-clean:
+	rm -rf build/arm64 build/amd64 vendor-arm64 vendor-amd64 
+
+
+################################################
+# Distributable Artifacts (tars and containers) #
+################################################
+
+dist-base:
+	mkdir -p dist &&\
+	pushd build/$(ARCH) &&\
+	tar czf ../../dist/wakunode-$(GIT_VERSION)-$(ARCH).tgz $(BINARIES)
+
+dist-amd64: static-amd64
+	$(MAKE) $(JOBS) dist-base ARCH=amd64
+
+dist-arm64: static-arm64
+	$(MAKE) $(JOBS) dist-base ARCH=arm64
+
+dist-container-base:
+	echo $(ARCH) &&\
+	ls &&\
+	cd build/$(ARCH) &&\
+	docker build -t nwaku:$(NWAKU_DIST_TAG)$(ARCH)  -f ../../docker/dist/Dockerfile.$(ARCH) .
+
+dist-container-amd64: | dist-amd64
+	$(MAKE) $(JOBS) dist-container-base  ARCH=amd64
+	
+dist-container-arm64: | dist-arm64
+	$(MAKE) $(JOBS) dist-container-base ARCH=arm64
+
+dist-container: 
+	$(MAKE) $(JOBS) dist-container-amd64
+	$(MAKE) $(JOBS) dist-container-arm64
+	docker manifest create quay.io/vpavlin0/nwaku:multiarch \
+		--amend nwaku:$(NWAKU_DIST_TAG)amd64 \
+		--amend nwaku:$(NWAKU_DIST_TAG)arm64
+
+###################
+# Release Targets #
+###################
+
+release-notes:
+	docker run \
+		-it \
+		--rm \
+		-v $${PWD}:/opt/sv4git/repo:z \
+		-u $(shell id -u) \
+		quay.io/vpavlin0/sv4git:latest \
+			release-notes

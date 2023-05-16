@@ -1,0 +1,34 @@
+pipeline {
+  agent { label 'linux' }
+
+  options {
+    timestamps()
+    timeout(time: 20, unit: 'MINUTES')
+    buildDiscarder(logRotator(
+      numToKeepStr: '10',
+      daysToKeepStr: '30',
+    ))
+  }
+
+  parameters {
+    string(
+      name: 'REPOSITORY',
+      description: 'Name of container registry repository',
+      defaultValue: params.REPOSITORY ?: 'wakuorg',
+    )
+  }
+
+  stages {
+    stage('Build & Push') {
+      steps {
+        withDockerRegistry([credentialsId: "dockerhub-vacorgbot-api-token", url: ""]) {
+          dir("docker/base") {
+            sh "./build.sh --registry docker.io --repository ${params.REPOSITORY} --latest --push all"
+          }
+        }
+      }
+    }
+  } // stages
+
+} // pipeline
+

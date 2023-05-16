@@ -1,0 +1,5 @@
+FROM --platform=arm64 alpine:edge
+
+ADD . /usr/local/bin
+
+ENTRYPOINT [ "wakunode2" ]

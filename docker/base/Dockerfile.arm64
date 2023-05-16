@@ -1,0 +1,19 @@
+FROM --platform=arm64 alpine:edge
+
+ARG USER_ID
+ARG GROUP_ID
+
+RUN addgroup -g ${GROUP_ID} user; \
+    adduser --disabled-password --gecos '' -u ${USER_ID} -G user user;
+
+WORKDIR /home/user/nwaku
+ENTRYPOINT [ "entrypoint.sh" ]
+
+# Get build tools and required header files
+RUN apk add --no-cache bash git cargo build-base pcre-dev linux-headers
+
+ADD entrypoint.sh /bin/entrypoint.sh
+
+#RUN git clone https://github.com/waku-org/nwaku.git --depth 1 &&\
+#    cd nwaku &&\
+#    make deps
