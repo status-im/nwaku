@@ -49,14 +49,16 @@ proc getNonce*(n: NonceManager): NonceManagerResult[Nonce] =
 
   n.nextNonce = retNonce + 1
 
+ # This is modified for spam testing purposes, once the limit is reached the nonce value is reset to 0
   if retNonce >= n.nonceLimit:
-    return err(
-      NonceManagerError( 
-        kind: NonceLimitReached,
-        error:
-          "Nonce limit reached. Please wait for the next epoch. requested nonce: " &
-          $retNonce & " & nonceLimit: " & $n.nonceLimit,
-      )
-    )
+    retNonce = 0
+    # return err(
+    #   NonceManagerError( 
+    #     kind: NonceLimitReached,
+    #     error:
+    #       "Nonce limit reached. Please wait for the next epoch. requested nonce: " &
+    #       $retNonce & " & nonceLimit: " & $n.nonceLimit,
+    #   )
+    # )
 
   return ok(retNonce)

@@ -15,7 +15,7 @@ import
 logScope:
   topics = "rln_keystore_generator"
 
-proc doRlnKeystoreGenerator*(conf: WakuNodeConf) =
+proc doRlnKeystoreGenerator*(conf: WakuNodeConf, quitOnSucces: bool = true) =
   # 1. load configuration
   trace "configuration", conf = $conf
 
@@ -42,7 +42,7 @@ proc doRlnKeystoreGenerator*(conf: WakuNodeConf) =
     idSecretHash = credential.idSecretHash.inHex(),
     idCommitment = credential.idCommitment.inHex()
 
-  if not conf.execute:
+  if quitOnSucces and not conf.execute:
     info "not executing, exiting"
     quit(0)
 
@@ -91,7 +91,6 @@ proc doRlnKeystoreGenerator*(conf: WakuNodeConf) =
     userMessageLimit: conf.rlnRelayUserMessageLimit,
   )
 
-
   let persistRes = addMembershipCredentials(
     conf.rlnRelayCredPath, keystoreCred, conf.rlnRelayCredPassword, RLNAppInfo
   )
@@ -106,4 +105,6 @@ proc doRlnKeystoreGenerator*(conf: WakuNodeConf) =
   except CatchableError:
     error "failure while stopping OnchainGroupManager", error = getCurrentExceptionMsg()
     quit(0) # 0 because we already registered on-chain
-  quit(0)
+
+  if quitOnSucces:
+    quit(0)

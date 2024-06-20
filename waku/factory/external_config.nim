@@ -595,6 +595,31 @@ type WakuNodeConf* = object
       name: "request-rate-period"
     .}: int64
 
+    spammerEnable* {.desc: "Enable spammer", defaultValue: false, name: "spammer".}:
+      bool
+    # msgRate* {.
+    #   desc: "Number of messages published per epoch",
+    #   defaultValue: 10,
+    #   name: "spammer-msg-rate"
+    # .}: int
+
+    # msgRateMultiplier* {.
+    #   desc: "Multiply max message per epoch to publish spam",
+    #   defaultValue: 1,
+    #   name: "spammer-msg-multiplier"
+    # .}: float
+    spammerDelay* {.
+      desc: "Delay between spawning a publish method (in miliseconds)",
+      defaultValue: 0,
+      name: "spammer-delay-between-msg"
+    .}: int
+
+    spammerBurst* {.
+      desc: "Send messages in burst instead of one by one",
+      defaultValue: false,
+      name: "spammer-burst"
+    .}: bool
+
 ## Parsing
 
 # NOTE: Keys are different in nim-libp2p

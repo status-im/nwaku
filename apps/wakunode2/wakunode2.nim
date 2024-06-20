@@ -12,6 +12,7 @@ import
   system/ansi_c,
   libp2p/crypto/crypto
 import
+  ./spammer,
   ../../tools/rln_keystore_generator/rln_keystore_generator,
   ../../tools/rln_db_inspector/rln_db_inspector,
   ../../waku/common/logging,
@@ -52,6 +53,8 @@ when isMainModule:
   of inspectRlnDb:
     doInspectRlnDb(conf)
   of noCommand:
+    if conf.spammerEnable:
+      doRlnKeystoreGenerator(conf, false)
     # NOTE: {.threadvar.} is used to make the global variable GC safe for the closure uses it
     # It will always be called from main thread anyway.
     # Ref: https://nim-lang.org/docs/manual.html#threads-gc-safety
@@ -131,5 +134,7 @@ when isMainModule:
       c_signal(ansi_c.SIGSEGV, handleSigsegv)
 
     info "Node setup complete"
+
+    asyncSpawn runSpammer(waku, conf)
 
     runForever()
