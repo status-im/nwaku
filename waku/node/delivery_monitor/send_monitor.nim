@@ -11,7 +11,7 @@ import
   ../../waku_store/[client, common],
   ../../waku_archive/archive,
   ../../waku_relay/protocol,
-  ../../waku_lightpush/client
+  ../../waku_lightpush_legacy/client
 
 const MaxTimeInCache* = chronos.minutes(1)
   ## Messages older than this time will get completely forgotten on publication and a
@@ -45,15 +45,15 @@ type SendMonitor* = ref object of PublishObserver
   deliveryCb: DeliveryFeedbackCallback
 
   wakuRelay: protocol.WakuRelay
-  wakuLightpushClient: WakuLightPushClient
+  wakuLegacyLightpushClient: WakuLegacyLightPushClient
 
 proc new*(
     T: type SendMonitor,
     storeClient: WakuStoreClient,
     wakuRelay: protocol.WakuRelay,
-    wakuLightpushClient: WakuLightPushClient,
+    wakuLegacyLightpushClient: WakuLegacyLightPushClient,
 ): Result[T, string] =
-  if wakuRelay.isNil() and wakuLightpushClient.isNil():
+  if wakuRelay.isNil() and wakuLegacyLightpushClient.isNil():
     return err(
       "Could not create SendMonitor. wakuRelay or wakuLightpushClient should be set"
     )
@@ -64,14 +64,14 @@ proc new*(
     notDeliveredStorage: notDeliveredStorage,
     storeClient: storeClient,
     wakuRelay: wakuRelay,
-    wakuLightpushClient: wakuLightPushClient,
+    wakuLegacyLightpushClient: wakuLegacyLightPushClient,
   )
 
   if not wakuRelay.isNil():
     wakuRelay.addPublishObserver(sendMonitor)
 
-  if not wakuLightpushClient.isNil():
-    wakuLightpushClient.addPublishObserver(sendMonitor)
+  if not wakuLegacyLightpushClient.isNil():
+    wakuLegacyLightpushClient.addPublishObserver(sendMonitor)
 
   return ok(sendMonitor)
 
@@ -172,13 +172,14 @@ proc processMessages(self: SendMonitor) {.async.} =
     if not self.wakuRelay.isNil():
       debug "trying to publish again with wakuRelay", msgHash, pubsubTopic
       let ret = await self.wakuRelay.publish(pubsubTopic, msg)
-      if ret == 0:
-        error "could not publish with wakuRelay.publish", msgHash, pubsubTopic
+      if ret.isErr():
+        error "could not publish with wakuRelay.publish",
+          msgHash, pubsubTopic, reason = ret.error.msg
       continue
 
-    if not self.wakuLightpushClient.isNil():
+    if not self.wakuLegacyLightpushClient.isNil():
       debug "trying to publish again with wakuLightpushClient", msgHash, pubsubTopic
-      (await self.wakuLightpushClient.publishToAny(pubsubTopic, msg)).isOkOr:
+      (await self.wakuLegacyLightpushClient.publishToAny(pubsubTopic, msg)).isOkOr:
         error "could not publish with publishToAny", error = $error
       continue
 

@@ -65,14 +65,15 @@ import
   ./node/test_all,
   ./waku_filter_v2/test_all,
   ./waku_peer_exchange/test_all,
-  ./waku_lightpush/test_all,
+  ./waku_lightpush_legacy/test_all,
   ./waku_relay/test_all,
   ./incentivization/test_all
 
 import
   # Waku v2 tests
   ./test_wakunode,
-  ./test_wakunode_lightpush,
+  # ./test_wakunode_lightpush,
+  ./test_wakunode_legacy_lightpush,
   ./test_peer_store_extended,
   ./test_message_cache,
   ./test_peer_manager,
@@ -98,7 +99,7 @@ import
   ./wakunode_rest/test_rest_relay_serdes,
   ./wakunode_rest/test_rest_serdes,
   ./wakunode_rest/test_rest_filter,
-  ./wakunode_rest/test_rest_lightpush,
+  ./wakunode_rest/test_rest_lightpush_legacy,
   ./wakunode_rest/test_rest_admin,
   ./wakunode_rest/test_rest_cors,
   ./wakunode_rest/test_rest_health

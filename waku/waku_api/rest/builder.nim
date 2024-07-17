@@ -12,6 +12,7 @@ import
   waku/waku_api/rest/debug/handlers as rest_debug_api,
   waku/waku_api/rest/relay/handlers as rest_relay_api,
   waku/waku_api/rest/filter/handlers as rest_filter_api,
+  waku/waku_api/rest/legacy_lightpush/handlers as rest_legacy_lightpush_api,
   waku/waku_api/rest/lightpush/handlers as rest_lightpush_api,
   waku/waku_api/rest/store/handlers as rest_store_api,
   waku/waku_api/rest/legacy_store/handlers as rest_store_legacy_api,
@@ -176,14 +177,17 @@ proc startRestServerProtocolSupport*(
   ## Light push API
   ## Install it either if lightpushnode (lightpush service node) is configured and client is mounted)
   ## or install it to be used with self-hosted lightpush service
-  if (conf.lightpushnode != "" and node.wakuLightpushClient != nil) or
-      (conf.lightpush and node.wakuLightPush != nil and node.wakuRelay != nil):
+  if (conf.lightpushnode != "" and node.wakuLegacyLightpushClient != nil) or
+      (conf.lightpush and node.wakuLegacyLightPush != nil and node.wakuRelay != nil):
     let lightDiscoHandler =
       if not wakuDiscv5.isNil():
         some(defaultDiscoveryHandler(wakuDiscv5, Lightpush))
       else:
         none(DiscoveryHandler)
 
+    rest_legacy_lightpush_api.installLightPushRequestHandler(
+      router, node, lightDiscoHandler
+    )
     rest_lightpush_api.installLightPushRequestHandler(router, node, lightDiscoHandler)
   else:
     restServerNotInstalledTab["lightpush"] =

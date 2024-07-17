@@ -15,13 +15,13 @@ import
     waku_core,
     waku_node,
     node/peer_manager,
-    waku_lightpush/common,
+    waku_lightpush_legacy/common,
     waku_api/rest/server,
     waku_api/rest/client,
     waku_api/rest/responses,
-    waku_api/rest/lightpush/types,
-    waku_api/rest/lightpush/handlers as lightpush_api,
-    waku_api/rest/lightpush/client as lightpush_api_client,
+    waku_api/rest/legacy_lightpush/types,
+    waku_api/rest/legacy_lightpush/handlers as lightpush_api,
+    waku_api/rest/legacy_lightpush/client as lightpush_api_client,
     waku_relay,
     common/rate_limit/setting,
   ],
@@ -61,8 +61,8 @@ proc init(
 
   await testSetup.consumerNode.mountRelay()
   await testSetup.serviceNode.mountRelay()
-  await testSetup.serviceNode.mountLightPush(rateLimit)
-  testSetup.pushNode.mountLightPushClient()
+  await testSetup.serviceNode.mountLegacyLightPush(rateLimit)
+  testSetup.pushNode.mountLegacyLightPushClient()
 
   testSetup.serviceNode.peerManager.addServicePeer(
     testSetup.consumerNode.peerInfo.toRemotePeerInfo(), WakuRelayCodec
@@ -73,7 +73,7 @@ proc init(
   )
 
   testSetup.pushNode.peerManager.addServicePeer(
-    testSetup.serviceNode.peerInfo.toRemotePeerInfo(), WakuLightPushCodec
+    testSetup.serviceNode.peerInfo.toRemotePeerInfo(), WakuLegacyLightPushCodec
   )
 
   var restPort = Port(0)
@@ -186,8 +186,7 @@ suite "Waku v2 Rest API - lightpush":
 
     await restLightPushTest.shutdown()
 
-  # disabled due to this bug in nim-chronos https://github.com/status-im/nim-chronos/issues/500
-  xasyncTest "Request rate limit push message":
+  asyncTest "Request rate limit push message":
     # Given
     let budgetCap = 3
     let tokenPeriod = 500.millis

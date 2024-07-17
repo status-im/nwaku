@@ -256,10 +256,10 @@ proc initRelayObservers(w: WakuRelay) =
       w, shortLog(peer.peerId), msg.topic, msg_id_short, wakuMessage, onRecv = true
     )
 
-  proc onSend(peer: PubSubPeer, msgs: var RPCMsg) =
+  proc onAfterSent(peer: PubSubPeer, msgs: RPCMsg) =
     for msg in msgs.messages:
       let (msg_id_short, topic, wakuMessage, msgSize) = decodeRpcMessageInfo(peer, msg).valueOr:
-        warn "onSend: failed decoding RPC info",
+        warn "onAfterSent: failed decoding RPC info",
           my_peer_id = w.switch.peerInfo.peerId, to_peer_id = peer.peerId
         continue
       logMessageInfo(
@@ -268,7 +268,7 @@ proc initRelayObservers(w: WakuRelay) =
       updateMetrics(peer, topic, wakuMessage, msgSize, onRecv = false)
 
   let administrativeObserver =
-    PubSubObserver(onRecv: onRecv, onSend: onSend, onValidated: onValidated)
+    PubSubObserver(onRecv: onRecv, onAfterSent: onAfterSent, onValidated: onValidated)
 
   w.addObserver(administrativeObserver)
 
@@ -514,19 +514,22 @@ proc unsubscribe*(w: WakuRelay, pubsubTopic: PubsubTopic, handler: TopicHandler)
 
 proc publish*(
     w: WakuRelay, pubsubTopic: PubsubTopic, message: WakuMessage
-): Future[int] {.async.} =
+): Future[Result[int, ref PublishingError]] {.async.} =
   let data = message.encode().buffer
 
   let msgHash = computeMessageHash(pubsubTopic, message).to0xHex()
   notice "start publish Waku message", msg_hash = msgHash, pubsubTopic = pubsubTopic
 
-  let relayedPeerCount = await procCall GossipSub(w).publish(pubsubTopic, data)
+  try:
+    let relayedPeerCount = await procCall GossipSub(w).publish(pubsubTopic, data)
 
-  if relayedPeerCount > 0:
-    for obs in w.publishObservers:
-      obs.onMessagePublished(pubSubTopic, message)
+    if relayedPeerCount > 0:
+      for obs in w.publishObservers:
+        obs.onMessagePublished(pubSubTopic, message)
 
-  return relayedPeerCount
+    return ok(relayedPeerCount)
+  except PublishingError as ex:
+    return err(ex)
 
 proc getNumConnectedPeers*(
     w: WakuRelay, pubsubTopic: PubsubTopic

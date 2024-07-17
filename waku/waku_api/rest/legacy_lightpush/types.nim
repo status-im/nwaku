@@ -13,16 +13,12 @@ export relay_types
 
 #### Types
 
-type
-  PushRequest* = object
-    pubsubTopic*: Option[PubSubTopic]
-    message*: RelayWakuMessage
-
-  PushResponse* = object
-    statusDesc*: Option[string]
-    relayPeerCount*: Option[uint32]
+type PushRequest* = object
+  pubsubTopic*: Option[PubSubTopic]
+  message*: RelayWakuMessage
 
 #### Serialization and deserialization
+
 proc writeValue*(
     writer: var JsonWriter[RestJson], value: PushRequest
 ) {.raises: [IOError].} =
@@ -69,46 +65,3 @@ proc readValue*(
         some(pubsubTopic.get()),
     message: message.get(),
   )
-
-proc writeValue*(
-    writer: var JsonWriter[RestJson], value: PushResponse
-) {.raises: [IOError].} =
-  writer.beginRecord()
-  if value.statusDesc.isSome():
-    writer.writeField("statusDesc", value.statusDesc.get())
-  if value.relayPeerCount.isSome():
-    writer.writeField("relayPeerCount", value.relayPeerCount.get())
-  writer.endRecord()
-
-proc readValue*(
-    reader: var JsonReader[RestJson], value: var PushResponse
-) {.raises: [SerializationError, IOError].} =
-  var
-    statusDesc = none(string)
-    relayPeerCount = none(uint32)
-
-  var keys = initHashSet[string]()
-  for fieldName in readObjectFields(reader):
-    # Check for reapeated keys
-    if keys.containsOrIncl(fieldName):
-      let err =
-        try:
-          fmt"Multiple `{fieldName}` fields found"
-        except CatchableError:
-          "Multiple fields with the same name found"
-      reader.raiseUnexpectedField(err, "PushResponse")
-
-    case fieldName
-    of "statusDesc":
-      statusDesc = some(reader.readValue(string))
-    of "relayPeerCount":
-      relayPeerCount = some(reader.readValue(uint32))
-    else:
-      unrecognizedFieldWarning(value)
-
-  if relayPeerCount.isNone() and statusDesc.isNone():
-    reader.raiseUnexpectedValue(
-      "Fields are missing, either `relayPeerCount` or `statusDesc` must be present"
-    )
-
-  value = PushResponse(statusDesc: statusDesc, relayPeerCount: relayPeerCount)

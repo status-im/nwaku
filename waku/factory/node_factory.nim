@@ -16,6 +16,7 @@ import
   ../waku_enr/sharding,
   ../waku_node,
   ../waku_core,
+  ../waku_core/codecs,
   ../waku_rln_relay,
   ../discovery/waku_dnsdisc,
   ../waku_archive/retention_policy as policy,
@@ -33,7 +34,7 @@ import
   ../node/peer_manager,
   ../node/peer_manager/peer_store/waku_peer_storage,
   ../node/peer_manager/peer_store/migrations as peer_store_sqlite_migrations,
-  ../waku_lightpush/common,
+  ../waku_lightpush_legacy/common,
   ../common/utils/parse_size_units,
   ../common/rate_limit/setting,
   ../common/databases/dburl
@@ -359,14 +360,17 @@ proc setupProtocols(
   if conf.lightpush:
     try:
       await mountLightPush(node, node.rateLimitSettings.getSetting(LIGHTPUSH))
+      await mountLegacyLightPush(node, node.rateLimitSettings.getSetting(LIGHTPUSH))
     except CatchableError:
       return err("failed to mount waku lightpush protocol: " & getCurrentExceptionMsg())
 
   mountLightPushClient(node)
+  mountLegacyLightPushClient(node)
   if conf.lightpushnode != "":
     let lightPushNode = parsePeerInfo(conf.lightpushnode)
     if lightPushNode.isOk():
       node.peerManager.addServicePeer(lightPushNode.value, WakuLightPushCodec)
+      node.peerManager.addServicePeer(lightPushNode.value, WakuLegacyLightPushCodec)
     else:
       return err("failed to set node waku lightpush peer: " & lightPushNode.error)
 

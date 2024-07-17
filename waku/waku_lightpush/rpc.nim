@@ -4,15 +4,13 @@ import std/options
 import ../waku_core
 
 type
-  PushRequest* = object
-    pubSubTopic*: string
+  LightpushRequest* = object
+    requestId*: string
+    pubSubTopic*: Option[PubsubTopic]
     message*: WakuMessage
 
-  PushResponse* = object
-    isSuccess*: bool
-    info*: Option[string]
-
-  PushRPC* = object
+  LightPushResponse* = object
     requestId*: string
-    request*: Option[PushRequest]
-    response*: Option[PushResponse]
+    statusCode*: uint32
+    statusDesc*: Option[string]
+    relayPeerCount*: Option[uint32]

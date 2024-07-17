@@ -202,7 +202,7 @@ when isMainModule:
   var codec = WakuLightPushCodec
   # mounting relevant client, for PX filter client must be mounted ahead
   if conf.testFunc == TesterFunctionality.SENDER:
-    wakuApp.node.mountLightPushClient()
+    wakuApp.node.mountLegacyLightPushClient()
     codec = WakuLightPushCodec
   else:
     waitFor wakuApp.node.mountFilterClient()

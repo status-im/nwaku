@@ -9,7 +9,7 @@ import
   ../../waku_core,
   ../../waku_store/client,
   ../../waku_relay/protocol,
-  ../../waku_lightpush/client,
+  ../../waku_lightpush_legacy/client,
   ../../waku_filter_v2/client
 
 type DeliveryMonitor* = ref object
@@ -20,12 +20,12 @@ proc new*(
     T: type DeliveryMonitor,
     storeClient: WakuStoreClient,
     wakuRelay: protocol.WakuRelay,
-    wakuLightpushClient: WakuLightPushClient,
+    wakuLegacyLightpushClient: WakuLegacyLightpushClient,
     wakuFilterClient: WakuFilterClient,
 ): Result[T, string] =
   ## storeClient is needed to give store visitility to DeliveryMonitor
-  ## wakuRelay and wakuLightpushClient are needed to give a mechanism to SendMonitor to re-publish
-  let sendMonitor = ?SendMonitor.new(storeClient, wakuRelay, wakuLightpushClient)
+  ## wakuRelay and wakuLegacyLightpushClient are needed to give a mechanism to SendMonitor to re-publish
+  let sendMonitor = ?SendMonitor.new(storeClient, wakuRelay, wakuLegacyLightpushClient)
   let recvMonitor = RecvMonitor.new(storeClient, wakuFilterClient)
   return ok(DeliveryMonitor(sendMonitor: sendMonitor, recvMonitor: recvMonitor))
 

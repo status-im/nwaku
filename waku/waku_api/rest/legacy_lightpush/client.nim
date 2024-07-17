@@ -21,6 +21,6 @@ proc encodeBytes*(value: PushRequest, contentType: string): RestResult[seq[byte]
 
 proc sendPushRequest*(
   body: PushRequest
-): RestResponse[PushResponse] {.
-  rest, endpoint: "/lightpush/v2/message", meth: HttpMethod.MethodPost
+): RestResponse[string] {.
+  rest, endpoint: "/lightpush/v1/message", meth: HttpMethod.MethodPost
 .}

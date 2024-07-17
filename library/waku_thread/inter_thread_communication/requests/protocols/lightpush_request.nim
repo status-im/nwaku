@@ -2,12 +2,13 @@ import options
 import chronicles, chronos, results
 import
   ../../../../../waku/waku_core/message/message,
+  ../../../../../waku/waku_core/codecs,
   ../../../../../waku/factory/waku,
   ../../../../../waku/waku_core/message,
   ../../../../../waku/waku_core/time, # Timestamp
   ../../../../../waku/waku_core/topics/pubsub_topic,
-  ../../../../../waku/waku_lightpush/client,
-  ../../../../../waku/waku_lightpush/common,
+  ../../../../../waku/waku_lightpush_legacy/client,
+  ../../../../../waku/waku_lightpush_legacy/common,
   ../../../../../waku/node/peer_manager/peer_manager,
   ../../../../alloc
 
@@ -98,7 +99,7 @@ proc process*(
       return err(errorMsg)
 
     let msgHashHex = (
-      await waku.node.wakuLightpushClient.publish(
+      await waku.node.wakuLegacyLightpushClient.publish(
         pubsubTopic, msg, peer = peerOpt.get()
       )
     ).valueOr:
