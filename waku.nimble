@@ -111,6 +111,10 @@ task wakucanary, "Build waku-canary tool":
   let name = "wakucanary"
   buildBinary name, "apps/wakucanary/"
 
+task peer_exchange_tester, "Build peer exchange tester tool":
+  let name = "peer_exchange_tester"
+  buildBinary name, "apps/peer_exchange_tester/"
+
 task networkmonitor, "Build network monitor tool":
   let name = "networkmonitor"
   buildBinary name, "apps/networkmonitor/"

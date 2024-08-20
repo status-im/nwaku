@@ -229,7 +229,7 @@ test/%: | build deps librln
 ################
 ## Waku tools ##
 ################
-.PHONY: tools wakucanary networkmonitor
+.PHONY: tools wakucanary networkmonitor peer_exchange_tester
 
 tools: networkmonitor wakucanary
 
@@ -241,6 +241,9 @@ networkmonitor: | build deps librln
 	echo -e $(BUILD_MSG) "build/$@" && \
 		$(ENV_SCRIPT) nim networkmonitor $(NIM_PARAMS) waku.nims
 
+peer_exchange_tester: | build deps librln
+	echo -e $(BUILD_MSG) "build/$@" && \
+		$(ENV_SCRIPT) nim peer_exchange_tester $(NIM_PARAMS) waku.nims
 
 ###################
 ## Documentation ##
