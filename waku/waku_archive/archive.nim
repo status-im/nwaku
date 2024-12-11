@@ -85,34 +85,44 @@ proc new*(
 proc handleMessage*(
     self: WakuArchive, pubsubTopic: PubsubTopic, msg: WakuMessage
 ) {.async.} =
+  let
+    msgHash = computeMessageHash(pubsubTopic, msg)
+    msgHashHex = msgHash.to0xHex()
+    msgTimestamp =
+      if msg.timestamp > 0:
+        msg.timestamp
+      else:
+        getNanosecondTime(getTime().toUnixFloat())
+
   self.validator(msg).isOkOr:
-    waku_archive_errors.inc(labelValues = [error])
-    trace "invalid message",
-      msg_hash = computeMessageHash(pubsubTopic, msg).to0xHex(),
+    error "failed validator message",
+      msg_hash = msgHashHex,
       pubsubTopic = pubsubTopic,
       contentTopic = msg.contentTopic,
-      timestamp = msg.timestamp,
-      error = error
+      msgTimestamp = msg.timestamp,
+      usedTimestamp = msgTimestamp,
+      error = $error
+    waku_archive_errors.inc(labelValues = [error])
     return
 
-  let msgHash = computeMessageHash(pubsubTopic, msg)
   let insertStartTime = getTime().toUnixFloat()
 
   (await self.driver.put(msgHash, pubsubTopic, msg)).isOkOr:
     waku_archive_errors.inc(labelValues = [insertFailure])
-    trace "failed to insert message",
+    error "failed to insert message",
       msg_hash = msgHash.to0xHex(),
       pubsubTopic = pubsubTopic,
       contentTopic = msg.contentTopic,
       timestamp = msg.timestamp,
-      error = error
+      error = $error
     return
 
-  trace "message archived",
-    msg_hash = msgHash.to0xHex(),
+  debug "message archived",
+    msg_hash = msgHashHex,
     pubsubTopic = pubsubTopic,
     contentTopic = msg.contentTopic,
-    timestamp = msg.timestamp
+    msgTimestamp = msg.timestamp,
+    usedTimestamp = msgTimestamp
 
   let insertDuration = getTime().toUnixFloat() - insertStartTime
   waku_archive_insert_duration_seconds.observe(insertDuration)
@@ -127,7 +137,7 @@ proc syncMessageIngress*(
 
   (await self.driver.put(msgHash, pubsubTopic, msg)).isOkOr:
     waku_archive_errors.inc(labelValues = [insertFailure])
-    trace "failed to insert message",
+    error "failed to insert message",
       msg_hash = msgHash.to0xHex(),
       pubsubTopic = pubsubTopic,
       contentTopic = msg.contentTopic,

@@ -79,13 +79,7 @@ proc new*(
 proc handleMessage*(
     self: WakuArchive, pubsubTopic: PubsubTopic, msg: WakuMessage
 ) {.async.} =
-  self.validator(msg).isOkOr:
-    waku_legacy_archive_errors.inc(labelValues = [error])
-    return
-
   let
-    msgDigest = computeDigest(msg)
-    msgDigestHex = msgDigest.data.to0xHex()
     msgHash = computeMessageHash(pubsubTopic, msg)
     msgHashHex = msgHash.to0xHex()
     msgTimestamp =
@@ -93,6 +87,20 @@ proc handleMessage*(
         msg.timestamp
       else:
         getNanosecondTime(getTime().toUnixFloat())
+    msgDigest = computeDigest(msg)
+    msgDigestHex = msgDigest.data.to0xHex()
+
+  self.validator(msg).isOkOr:
+    error "failed validator message",
+      msg_hash = msgHashHex,
+      pubsubTopic = pubsubTopic,
+      contentTopic = msg.contentTopic,
+      msgTimestamp = msg.timestamp,
+      usedTimestamp = msgTimestamp,
+      digest = msgDigestHex,
+      error = $error
+    waku_legacy_archive_errors.inc(labelValues = [error])
+    return
 
   trace "handling message",
     msg_hash = msgHashHex,
@@ -106,7 +114,13 @@ proc handleMessage*(
 
   (await self.driver.put(pubsubTopic, msg, msgDigest, msgHash, msgTimestamp)).isOkOr:
     waku_legacy_archive_errors.inc(labelValues = [insertFailure])
-    error "failed to insert message", error = error
+    error "failed to insert message",
+      msg_hash = msgHashHex,
+      pubsubTopic = pubsubTopic,
+      contentTopic = msg.contentTopic,
+      msgTimestamp = msg.timestamp,
+      digest = msgDigestHex,
+      error = $error
     return
 
   debug "message archived",
