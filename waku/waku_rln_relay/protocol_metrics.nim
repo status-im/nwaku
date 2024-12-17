@@ -104,8 +104,9 @@ proc getRlnMetricsLogger*(): RLNMetricsLogger =
         )
         let freshProofsGeneratedCount =
           parseAndAccumulate(waku_rln_total_generated_proofs, cumulativeProofsGenerated)
-        let freshProofsRemainingCount =
-          parseAndAccumulate(waku_rln_remaining_proofs_per_epoch, cumulativeProofsRemaining)
+        let freshProofsRemainingCount = parseAndAccumulate(
+          waku_rln_remaining_proofs_per_epoch, cumulativeProofsRemaining
+        )
 
         info "Total messages", count = freshMsgCount
         info "Total spam messages", count = freshSpamCount
