@@ -16,7 +16,6 @@ import
     factory/external_config,
     factory/waku,
     node/health_monitor,
-    node/waku_metrics,
     waku_api/rest/builder as rest_server_builder,
   ]
 
@@ -82,10 +81,6 @@ when isMainModule:
       restServer, waku.node, waku.wakuDiscv5, confCopy
     ).isOkOr:
       error "Starting protocols support REST server failed.", error = $error
-      quit(QuitFailure)
-
-    waku.metricsServer = waku_metrics.startMetricsServerAndLogging(confCopy).valueOr:
-      error "Starting monitoring and external interfaces failed", error = error
       quit(QuitFailure)
 
     nodeHealthMonitor.setOverallHealth(HealthStatus.READY)

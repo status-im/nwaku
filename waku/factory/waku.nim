@@ -26,6 +26,7 @@ import
   ../waku_node,
   ../node/peer_manager,
   ../node/health_monitor,
+  ../node/waku_metrics,
   ../node/delivery_monitor/delivery_monitor,
   ../waku_api/message_cache,
   ../waku_api/rest/server,
@@ -440,6 +441,9 @@ proc startWaku*(waku: ptr Waku): Future[Result[void, string]] {.async.} =
 
     (await waku.wakuDiscV5.start()).isOkOr:
       return err("failed to start waku discovery v5: " & $error)
+
+  waku.metricsServer = startMetricsServerAndLogging(waku[].conf).valueOr:
+    return err("failed to start metrics server and logging: " & $error)
 
   ## Reliability
   if not waku[].deliveryMonitor.isNil():
