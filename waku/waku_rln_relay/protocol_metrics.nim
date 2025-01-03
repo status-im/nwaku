@@ -84,7 +84,7 @@ proc getRlnMetricsLogger*(): RLNMetricsLogger =
   var cumulativeValidMessages = 0.float64
   var cumulativeProofsVerified = 0.float64
   var cumulativeProofsGenerated = 0.float64
-  var cumulativeProofsRemaining = 100.float64
+  var cumulativeProofsRemaining = 0.float64
 
   when defined(metrics):
     logMetrics = proc() =
