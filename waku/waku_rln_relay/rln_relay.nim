@@ -99,7 +99,8 @@ proc calcEpoch*(rlnPeer: WakuRLNRelay, t: float64): Epoch =
 
 proc nextEpoch*(rlnPeer: WakuRLNRelay, t: float64): float64 =
   # Calculates the next epoch time from the given time `t`.
-  float64(uint64(t / rlnPeer.rlnEpochSizeSec.float64) + 1) * rlnPeer.rlnEpochSizeSec.float64
+  float64(uint64(t / rlnPeer.rlnEpochSizeSec.float64) + 1) *
+    rlnPeer.rlnEpochSizeSec.float64
 
 proc stop*(rlnPeer: WakuRLNRelay) {.async: (raises: [Exception]).} =
   ## stops the rln-relay protocol
