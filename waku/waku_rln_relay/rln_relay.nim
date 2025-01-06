@@ -98,25 +98,16 @@ proc calcEpoch*(rlnPeer: WakuRLNRelay, t: float64): Epoch =
   return toEpoch(e)
 
 proc nextEpoch*(rlnPeer: WakuRLNRelay, t: float64): float64 =
-  let currentEpoch = rlnPeer.calcEpoch(t)
-  var timePtr = t
+  let
+    currentEpoch = uint64(t / rlnPeer.rlnEpochSizeSec.float64)
+    nextEpochTime = float64(currentEpoch + 1) * rlnPeer.rlnEpochSizeSec.float64
+    currentTime = epochTime()
 
-  # Increment by minutes until the epoch changes
-  while rlnPeer.calcEpoch(timePtr) == currentEpoch:
-    timePtr += 60 # 1 minute
-
-  # Backtrack to the last minute of the current epoch
-  timePtr -= 60
-
-  # Increment by seconds to find the exact transition
-  while rlnPeer.calcEpoch(timePtr) == currentEpoch:
-    timePtr += 1 # 1 second
-
-  # Ensure the returned time is in the future
-  if timePtr > epochTime():
-    return timePtr
+  # Ensure we always return a future time
+  if nextEpochTime > currentTime:
+    return nextEpochTime
   else:
-    return epochTime()
+    return currentTime
 
 proc stop*(rlnPeer: WakuRLNRelay) {.async: (raises: [Exception]).} =
   ## stops the rln-relay protocol
