@@ -84,6 +84,13 @@ int waku_relay_subscribe(void* ctx,
                          WakuCallBack callback,
                          void* userData);
 
+int waku_relay_add_protected_shard(void* ctx,
+                                   int clusterId,
+                                   int shardId,
+                                   char* publicKey,
+                                   WakuCallBack callback,
+                                   void* userData);
+
 int waku_relay_unsubscribe(void* ctx,
                            const char* pubSubTopic,
                            WakuCallBack callback,

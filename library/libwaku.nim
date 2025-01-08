@@ -386,6 +386,33 @@ proc waku_relay_subscribe(
     userData,
   )
 
+proc waku_relay_add_protected_shard(
+    ctx: ptr WakuContext,
+    clusterId: cint,
+    shardId: cint,
+    publicKey: cstring,
+    callback: WakuCallBack,
+    userData: pointer,
+): cint {.dynlib, exportc, cdecl.} =
+  initializeLibrary()
+  checkLibwakuParams(ctx, callback, userData)
+  let pubk = publicKey.alloc()
+  defer:
+    deallocShared(pubk)
+
+  handleRequest(
+    ctx,
+    RequestType.RELAY,
+    RelayRequest.createShared(
+      RelayMsgType.ADD_PROTECTED_SHARD,
+      clusterId = clusterId,
+      shardId = shardId,
+      publicKey = $pubk,
+    ),
+    callback,
+    userData,
+  )
+
 proc waku_relay_unsubscribe(
     ctx: ptr WakuContext,
     pubSubTopic: cstring,
