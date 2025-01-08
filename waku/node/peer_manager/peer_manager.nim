@@ -71,6 +71,10 @@ const
   # Max peers that we allow from the same IP
   DefaultColocationLimit* = 5
 
+type ConnectionChangeHandler* = proc(
+  peerId: PeerId, peerEvent: PeerEventKind
+): Future[void] {.gcsafe, raises: [Defect].}
+
 type PeerManager* = ref object of RootObj
   switch*: Switch
   wakuPeerStore*: WakuPeerStore
@@ -87,6 +91,7 @@ type PeerManager* = ref object of RootObj
   colocationLimit*: int
   started: bool
   shardedPeerManagement: bool # temp feature flag
+  onConnectionChange*: ConnectionChangeHandler
 
 #~~~~~~~~~~~~~~~~~~~#
 # Helper Functions  #
@@ -676,6 +681,9 @@ proc onPeerEvent(pm: PeerManager, peerId: PeerId, event: PeerEvent) {.async.} =
           debug "Pruning connection due to ip colocation", peerId = peerId, ip = ip
           asyncSpawn(pm.switch.disconnect(peerId))
           pm.wakuPeerStore.delete(peerId)
+    if not pm.onConnectionChange.isNil():
+      # we don't want to await for the callback to finish
+      asyncSpawn pm.onConnectionChange(peerId, Joined)
   of Left:
     direction = UnknownDirection
     connectedness = CanConnect
@@ -687,6 +695,9 @@ proc onPeerEvent(pm: PeerManager, peerId: PeerId, event: PeerEvent) {.async.} =
         if pm.ipTable[ip].len == 0:
           pm.ipTable.del(ip)
         break
+    if not pm.onConnectionChange.isNil():
+      # we don't want to await for the callback to finish
+      asyncSpawn pm.onConnectionChange(peerId, Left)
   of Identified:
     debug "event identified", peerId = peerId
 

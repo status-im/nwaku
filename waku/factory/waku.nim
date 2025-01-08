@@ -175,6 +175,12 @@ proc setupAppCallbacks(
         err("Cannot configure topicHealthChangeHandler callback without Relay mounted")
     node.wakuRelay.onTopicHealthChange = appCallbacks.topicHealthChangeHandler
 
+  if not appCallbacks.connectionChangeHandler.isNil():
+    if node.peerManager.isNil():
+      return
+        err("Cannot configure connectionChangeHandler callback with empty peer manager")
+    node.peerManager.onConnectionChange = appCallbacks.connectionChangeHandler
+
   return ok()
 
 proc new*(
