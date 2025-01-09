@@ -1,7 +1,7 @@
 {.push raises: [].}
 
 import
-  std/[nre, options, sequtils, strutils, strformat, times, sugar],
+  std/[options, sequtils, strutils, strformat, times, sugar],
   stew/[byteutils, arrayops],
   results,
   chronos,

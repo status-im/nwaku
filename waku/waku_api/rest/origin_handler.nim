@@ -1,34 +1,35 @@
 {.push raises: [].}
 
 import
-  std/[options, strutils, re, net],
+  std/[options, strutils, net],
+  regex,
   results,
   chronicles,
   chronos,
   chronos/apps/http/httpserver
 
 type OriginHandlerMiddlewareRef* = ref object of HttpServerMiddlewareRef
-  allowedOriginMatcher: Option[Regex]
+  allowedOriginMatcher: Option[Regex2]
   everyOriginAllowed: bool
 
 proc isEveryOriginAllowed(maybeAllowedOrigin: Option[string]): bool =
   return maybeAllowedOrigin.isSome() and maybeAllowedOrigin.get() == "*"
 
-proc compileOriginMatcher(maybeAllowedOrigin: Option[string]): Option[Regex] =
+proc compileOriginMatcher(maybeAllowedOrigin: Option[string]): Option[Regex2] =
   if maybeAllowedOrigin.isNone():
-    return none(Regex)
+    return none(Regex2)
 
   let allowedOrigin = maybeAllowedOrigin.get()
 
   if (len(allowedOrigin) == 0):
-    return none(Regex)
+    return none(Regex2)
 
   try:
     var matchOrigin: string
 
     if allowedOrigin == "*":
       matchOrigin = r".*"
-      return some(re(matchOrigin, {reIgnoreCase, reExtended}))
+      return some(re2(matchOrigin, {regexCaseless, regexExtended}))
 
     let allowedOrigins = allowedOrigin.split(",")
 
@@ -54,11 +55,11 @@ proc compileOriginMatcher(maybeAllowedOrigin: Option[string]): Option[Regex] =
 
     let finalExpression = matchExpressions.join("|")
 
-    return some(re(finalExpression, {reIgnoreCase, reExtended}))
+    return some(re2(finalExpression, {regexCaseless, regexExtended}))
   except RegexError:
     var msg = getCurrentExceptionMsg()
     error "Failed to compile regex", source = allowedOrigin, err = msg
-    return none(Regex)
+    return none(Regex2)
 
 proc originsMatch(
     originHandler: OriginHandlerMiddlewareRef, requestOrigin: string

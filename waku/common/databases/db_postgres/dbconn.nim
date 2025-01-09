@@ -1,10 +1,10 @@
 import
   std/[times, strutils, asyncnet, os, sequtils, sets, strformat],
+  regex,
   results,
   chronos,
   chronos/threadsync,
   metrics,
-  re,
   chronicles
 import ./query_metrics
 
@@ -247,8 +247,8 @@ proc dbConnQuery*(
 
   let cleanedQuery = ($query).replace(" ", "").replace("\n", "")
   ## remove everything between ' or " all possible sequence of numbers. e.g. rm partition partition
-  var querySummary = cleanedQuery.replace(re"""(['"]).*?\1""", "")
-  querySummary = querySummary.replace(re"\d+", "")
+  var querySummary = cleanedQuery.replace(re2("""(['"]).*?\\1"""), "")
+  querySummary = querySummary.replace(re2"\d+", "")
   querySummary = "query_tag_" & querySummary[0 ..< min(querySummary.len, 200)]
 
   var queryStartTime = getTime().toUnixFloat()

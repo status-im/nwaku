@@ -4,7 +4,7 @@ else:
   {.push raises: [].}
 
 import
-  std/[nre, options, sequtils, strutils, strformat, times],
+  std/[options, sequtils, strutils, strformat, times],
   stew/[byteutils, arrayops],
   results,
   chronos,
