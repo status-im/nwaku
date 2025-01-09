@@ -1,7 +1,7 @@
 package main
 
 /*
-	#cgo LDFLAGS: -L../../build/ -lwaku -lnegentropy
+	#cgo LDFLAGS: -L../../build/ -lwaku
 	#cgo LDFLAGS: -L../../ -Wl,-rpath,../../
 
 	#include "../../library/libwaku.h"
