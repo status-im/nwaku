@@ -972,7 +972,7 @@ proc lightpushPublish*(
     pubsubTopic: Option[PubsubTopic],
     message: WakuMessage,
     peer: RemotePeerInfo,
-): Future[WakuLightPushResult[void]] {.async, gcsafe.} =
+): Future[WakuLightPushResult[string]] {.async, gcsafe.} =
   ## Pushes a `WakuMessage` to a node which relays it further on PubSub topic.
   ## Returns whether relaying was successful or not.
   ## `WakuMessage` should contain a `contentTopic` field for light node
@@ -986,7 +986,7 @@ proc lightpushPublish*(
       pubsubTopic: PubsubTopic,
       message: WakuMessage,
       peer: RemotePeerInfo,
-  ): Future[WakuLightPushResult[void]] {.async, gcsafe.} =
+  ): Future[WakuLightPushResult[string]] {.async, gcsafe.} =
     let msgHash = pubsubTopic.computeMessageHash(message).to0xHex()
     if not node.wakuLightpushClient.isNil():
       notice "publishing message with lightpush",
@@ -1023,7 +1023,7 @@ proc lightpushPublish*(
 # TODO: Move to application module (e.g., wakunode2.nim)
 proc lightpushPublish*(
     node: WakuNode, pubsubTopic: Option[PubsubTopic], message: WakuMessage
-): Future[WakuLightPushResult[void]] {.
+): Future[WakuLightPushResult[string]] {.
     async, gcsafe, deprecated: "Use 'node.lightpushPublish()' instead"
 .} =
   if node.wakuLightpushClient.isNil() and node.wakuLightPush.isNil():
@@ -1040,13 +1040,7 @@ proc lightpushPublish*(
   elif not node.wakuLightPush.isNil():
     peerOpt = some(RemotePeerInfo.init($node.switch.peerInfo.peerId))
 
-  let publishRes =
-    await node.lightpushPublish(pubsubTopic, message, peer = peerOpt.get())
-
-  if publishRes.isErr():
-    error "failed to publish message", error = publishRes.error
-
-  return publishRes
+  return await node.lightpushPublish(pubsubTopic, message, peer = peerOpt.get())
 
 ## Waku RLN Relay
 proc mountRlnRelay*(

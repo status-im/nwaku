@@ -106,9 +106,6 @@ proc destroyShared(self: ptr StoreRequest) =
 proc process_remote_query(
     self: ptr StoreRequest, waku: ptr Waku
 ): Future[Result[string, string]] {.async.} =
-  defer:
-    destroyShared(self)
-
   let jsonContentRes = catch:
     parseJson($self[].jsonQuery)
 

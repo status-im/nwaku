@@ -9,7 +9,7 @@
 ## which spawn a full service Waku node
 ## that could be used also as a lightpush client, helping testing and development.
 
-import results, chronos, std/options, metrics
+import results, chronos, chronicles, std/options, metrics, stew/byteutils
 import
   ../waku_core,
   ./protocol,
@@ -21,9 +21,10 @@ import
 
 proc handleSelfLightPushRequest*(
     self: WakuLightPush, pubSubTopic: PubsubTopic, message: WakuMessage
-): Future[WakuLightPushResult[void]] {.async.} =
+): Future[WakuLightPushResult[string]] {.async.} =
   ## Handles the lightpush requests made by the node to itself.
   ## Normally used in REST-lightpush requests
+  ## On success, returns the msg_hash of the published message.
 
   try:
     # provide self peerId as now this node is used directly, thus there is no light client sender peer.
@@ -45,6 +46,14 @@ proc handleSelfLightPushRequest*(
       else:
         return err("unknown failure")
 
-    return ok()
+    let msg_hash_hex_str = computeMessageHash(pubSubTopic, message).to0xHex()
+
+    notice "publishing message with self hosted lightpush",
+      pubsubTopic = pubsubTopic,
+      contentTopic = message.contentTopic,
+      self_peer_id = selfPeerId,
+      msg_hash = msg_hash_hex_str
+
+    return ok(msg_hash_hex_str)
   except Exception:
     return err("exception in handleSelfLightPushRequest: " & getCurrentExceptionMsg())

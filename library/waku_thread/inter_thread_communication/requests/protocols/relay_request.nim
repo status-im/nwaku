@@ -41,12 +41,12 @@ type RelayRequest* = object
 proc createShared*(
     T: type RelayRequest,
     op: RelayMsgType,
-    pubsubTopic: PubsubTopic = "",
+    pubsubTopic: cstring = nil,
     relayEventCallback: WakuRelayHandler = nil,
     m = WakuMessage(),
     clusterId: cint = 0,
     shardId: cint = 0,
-    publicKey: string = "",
+    publicKey: cstring = nil,
 ): ptr type T =
   var ret = createShared(T)
   ret[].operation = op

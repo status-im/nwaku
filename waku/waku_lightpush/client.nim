@@ -71,24 +71,23 @@ proc publish*(
     wl: WakuLightPushClient,
     pubSubTopic: PubsubTopic,
     message: WakuMessage,
-    peer: PeerId | RemotePeerInfo,
-): Future[WakuLightPushResult[void]] {.async, gcsafe.} =
-  when peer is PeerId:
-    info "publish",
-      peerId = shortLog(peer),
-      msg_hash = computeMessageHash(pubsubTopic, message).to0xHex
-  else:
-    info "publish",
-      peerId = shortLog(peer.peerId),
-      msg_hash = computeMessageHash(pubsubTopic, message).to0xHex
-
+    peer: RemotePeerInfo,
+): Future[WakuLightPushResult[string]] {.async, gcsafe.} =
+  ## On success, returns the msg_hash of the published message
+  let msg_hash_hex_str = computeMessageHash(pubsubTopic, message).to0xHex()
   let pushRequest = PushRequest(pubSubTopic: pubSubTopic, message: message)
   ?await wl.sendPushRequest(pushRequest, peer)
 
   for obs in wl.publishObservers:
     obs.onMessagePublished(pubSubTopic, message)
 
-  return ok()
+  notice "publishing message with lightpush",
+    pubsubTopic = pubsubTopic,
+    contentTopic = message.contentTopic,
+    target_peer_id = peer.peerId,
+    msg_hash = msg_hash_hex_str
+
+  return ok(msg_hash_hex_str)
 
 proc publishToAny*(
     wl: WakuLightPushClient, pubSubTopic: PubsubTopic, message: WakuMessage
