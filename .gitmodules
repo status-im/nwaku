@@ -174,3 +174,7 @@
 	branch = master
 	path = vendor/nph
 	url = https://github.com/arnetheduck/nph.git
+[submodule "vendor/mix"]
+	path = vendor/mix
+	url = https://github.com/vacp2p/mix.git
+	branch = mix-transport

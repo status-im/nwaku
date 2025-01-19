@@ -130,6 +130,8 @@ task example2, "Build Waku examples":
   buildBinary "subscriber", "examples/"
   buildBinary "filter_subscriber", "examples/"
   buildBinary "lightpush_publisher", "examples/"
+  buildBinary "mix_filter_subscriber", "examples/"
+  buildBinary "mix_lightpush_publisher", "examples/"
 
 task chat2, "Build example Waku chat usage":
   # NOTE For debugging, set debug level. For chat usage we want minimal log
