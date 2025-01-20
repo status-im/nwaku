@@ -32,7 +32,7 @@ build_component() {
     local dir="$1"
     local command="$2"
     local name="$3"
-    
+
     echo "Building $name"
     if [ -d "$dir" ]; then
         change_directory "$dir"
@@ -53,16 +53,27 @@ execute_command "mkdir -p tmp"
 echo "3. Building Nim"
 build_component "vendor/nimbus-build-system/vendor/Nim" "./build_all.bat" "Nim"
 
-echo "4. Building miniupnpc"
+echo "4. changing branch"
+cd "vendor/nim-nat-traversal/vendor/miniupnp"
+git checkout little_chore_windows_support
+cd ../../../..
+
+echo "5. Building miniupnpc"
 build_component "vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc" "./mingw32make.bat" "miniupnpc"
 
-echo "5. Building libnatpmp"
-build_component "vendor/nim-nat-traversal/vendor/libnatpmp-upstream" "./build.bat" "libnatpmp"
+echo "6. Building libnatpmp"
+cd ./vendor/nim-nat-traversal/vendor/libnatpmp-upstream
+./build.bat
+mv natpmp.a libnatpmp.a
+cd ../../../../
 
-echo "6. Building libunwind"
-build_component "vendor/nim-libbacktrace" "make install/usr/lib/libunwind.a" "libunwind"
+echo "7. Building libunwind"
+cd vendor/nim-libbacktrace
+make all
+make install/usr/lib/libunwind.a
+cd ../../
 
-echo "7. Building wakunode2"
-execute_command "make wakunode2 V=1 NIMFLAGS="-d:disableMarchNative -d:postgres -d:chronicles_colors:none" "
+echo "8. Building wakunode2"
+make wakunode2 V=1
 
 echo "Windows setup completed successfully!"
