@@ -35,7 +35,8 @@ import
   ../node/peer_manager/peer_store/migrations as peer_store_sqlite_migrations,
   ../waku_lightpush/common,
   ../common/utils/parse_size_units,
-  ../common/rate_limit/setting
+  ../common/rate_limit/setting,
+  ../common/databases/dburl
 
 ## Peer persistence
 
@@ -267,8 +268,27 @@ proc setupProtocols(
     ## then the legacy will be in charge of performing the archiving.
     ## Regarding storage, the only diff between the current/future archive driver and the legacy
     ## one, is that the legacy stores an extra field: the id (message digest.)
+
+    ## TODO: remove this "migrate" variable once legacy store is removed
+    ## It is now necessary because sqlite's legacy store has an extra field: storedAt
+    ## This breaks compatibility between store's and legacy store's schemas in sqlite
+    ## So for now, we need to make sure that when legacy store is enabled and we use sqlite
+    ## that we migrate our db according to legacy store's schema to have the extra field
+
+    let engineRes = dburl.getDbEngine(conf.storeMessageDbUrl)
+    if engineRes.isErr():
+      return err("error getting db engine in setupProtocols: " & engineRes.error)
+
+    let engine = engineRes.get()
+
+    let migrate =
+      if engine == "sqlite" and conf.legacyStore:
+        false
+      else:
+        conf.storeMessageDbMigration
+
     let archiveDriverRes = waitFor driver.ArchiveDriver.new(
-      conf.storeMessageDbUrl, conf.storeMessageDbVacuum, conf.storeMessageDbMigration,
+      conf.storeMessageDbUrl, conf.storeMessageDbVacuum, migrate,
       conf.storeMaxNumDbConnections, onFatalErrorAction,
     )
     if archiveDriverRes.isErr():
