@@ -1,5 +1,4 @@
-import json_serialization, std/options
-import ../waku_core
+import std/options
 
 # Implementing the RFC:
 # https://github.com/vacp2p/rfc/tree/master/content/docs/rfcs/73

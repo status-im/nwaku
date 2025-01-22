@@ -607,7 +607,7 @@ suite "Waku RlnRelay - End to End - OnChain":
 
     asyncTest "Not enough gas":
       let
-        onChainGroupManager = await setup(ethAmount = 0.u256)
+        onChainGroupManager = await setupOnchainGroupManager(amountWei = 0.u256)
         contractAddress = onChainGroupManager.ethContractAddress
         keystorePath =
           genTempPath("rln_keystore", "test_wakunode_relay_rln-valid_contract")
