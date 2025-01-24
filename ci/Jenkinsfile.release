@@ -56,7 +56,12 @@ pipeline {
     )
     booleanParam(
       name: 'DEBUG',
-      description: 'Enable debug features (heaptrack).',
+      description: 'Enable debug features',
+      defaultValue: false
+    )
+    booleanParam(
+      name: 'HEAPTRACK',
+      description: 'Enable heaptrack build',
       defaultValue: false
     )
   }
@@ -73,7 +78,7 @@ pipeline {
           "--build-arg=NIMFLAGS='${params.NIMFLAGS} -d:postgres ' " +
           "--build-arg=LOG_LEVEL='${params.LOWEST_LOG_LEVEL_ALLOWED}' "  +
           "--build-arg=DEBUG='${params.DEBUG ? "1" : "0"} ' " +
-          "--target=${params.DEBUG ? "debug" : "prod"} ."
+          "--target=${params.HEAPTRACK ? "prod-with-heaptrack" : "prod"} ."
         )
       } }
     }

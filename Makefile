@@ -83,7 +83,7 @@ HEAPTRACKER_INJECT ?= 0
 ifeq ($(HEAPTRACKER), 1)
 # Needed to make nimbus-build-system use the Nim's 'heaptrack_support' branch
 DOCKER_NIM_COMMIT := NIM_COMMIT=heaptrack_support
-TARGET := debug
+TARGET := prod-with-heaptrack
 
 ifeq ($(HEAPTRACKER_INJECT), 1)
 # the Nim compiler will load 'libheaptrack_inject.so'
