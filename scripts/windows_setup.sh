@@ -51,7 +51,9 @@ echo "2. Creating tmp directory"
 execute_command "mkdir -p tmp"
 
 echo "3. Building Nim"
-build_component "vendor/nimbus-build-system/vendor/Nim" "./build_all.bat" "Nim"
+cd vendor/nimbus-build-system/vendor/Nim
+./build_all.bat
+cd ../../../../..
 
 echo "4. changing branch"
 cd "vendor/nim-nat-traversal/vendor/miniupnp"
@@ -59,7 +61,9 @@ git checkout little_chore_windows_support
 cd ../../../..
 
 echo "5. Building miniupnpc"
-build_component "vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc" "./mingw32make.bat" "miniupnpc"
+cd vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc
+./mingw32make.bat
+cd ../../../../..
 
 echo "6. Building libnatpmp"
 cd ./vendor/nim-nat-traversal/vendor/libnatpmp-upstream
