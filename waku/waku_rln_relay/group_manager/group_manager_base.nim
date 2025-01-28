@@ -200,14 +200,10 @@ method generateProof*(
       messageId = messageId,
     ).valueOr:
       return err("proof generation failed: " & $error)
-  return ok(proof)
 
-  if lastProcessedEpoch != epoch:
-    lastProcessedEpoch = epoch
-    waku_rln_proof_remining.set(g.userMessageLimit.get().float64 - 1)
-  else:
-    waku_rln_proof_remining.dec()
-  waku_rln_proofs_generated_total.inc()
+  waku_rln_remaining_proofs_per_epoch.dec()
+  waku_rln_total_generated_proofs.inc()
+  return ok(proof)
 
 method isReady*(g: GroupManager): Future[bool] {.base, async.} =
   raise newException(
