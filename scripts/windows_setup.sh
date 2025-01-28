@@ -53,17 +53,17 @@ execute_command "mkdir -p tmp"
 echo "3. Building Nim"
 cd vendor/nimbus-build-system/vendor/Nim
 ./build_all.bat
-cd ../../../../..
-
-echo "4. changing branch"
-cd "vendor/nim-nat-traversal/vendor/miniupnp"
-git checkout little_chore_windows_support
 cd ../../../..
 
-echo "5. Building miniupnpc"
-cd vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc
-./mingw32make.bat
-cd ../../../../..
+# echo "4. changing branch"
+# cd "vendor/nim-nat-traversal/vendor/miniupnp"
+# git checkout little_chore_windows_support
+# cd ../../../..
+
+# echo "5. Building miniupnpc"
+# cd vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc
+# ./mingw32make.bat
+# cd ../../../../..
 
 echo "6. Building libnatpmp"
 cd ./vendor/nim-nat-traversal/vendor/libnatpmp-upstream
@@ -78,6 +78,6 @@ make install/usr/lib/libunwind.a
 cd ../../
 
 echo "8. Building wakunode2"
-make wakunode2 V=1
+make wakunode2 LOG_LEVEL=DEBUG
 
 echo "Windows setup completed successfully!"
