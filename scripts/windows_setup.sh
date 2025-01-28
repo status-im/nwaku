@@ -55,15 +55,10 @@ cd vendor/nimbus-build-system/vendor/Nim
 ./build_all.bat
 cd ../../../..
 
-# echo "4. changing branch"
-# cd "vendor/nim-nat-traversal/vendor/miniupnp"
-# git checkout little_chore_windows_support
-# cd ../../../..
-
-# echo "5. Building miniupnpc"
-# cd vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc
+echo "5. Building miniupnpc"
+cd vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc
 # ./mingw32make.bat
-# cd ../../../../..
+cd ../../../../..
 
 echo "6. Building libnatpmp"
 cd ./vendor/nim-nat-traversal/vendor/libnatpmp-upstream
