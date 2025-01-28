@@ -53,6 +53,18 @@ func decodeRequestBody*[T](
       )
     )
 
+  # Validate and enforce URL encoding for pubsubTopic and contentTopics
+  if T.hasKey("pubsubTopic"):
+    let pubsubTopic = T["pubsubTopic"]
+    if pubsubTopic != encodeUrl(pubsubTopic):
+      return err(RestApiResponse.badRequest("Invalid or non-URL-encoded pubsubTopic parameter"))
+
+  if T.hasKey("contentTopics"):
+    let contentTopics = T["contentTopics"]
+    for topic in contentTopics:
+      if topic != encodeUrl(topic):
+        return err(RestApiResponse.badRequest("Invalid or non-URL-encoded content_topic parameter"))
+
   return ok(requestResult.get())
 
 proc decodeBytes*(
