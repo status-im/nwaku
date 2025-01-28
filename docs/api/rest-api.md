@@ -38,6 +38,9 @@ A particular OpenAPI spec can be easily imported into [Postman](https://www.post
 curl http://localhost:8645/debug/v1/info -s | jq
 ```
 
+### Store API
+
+The `page_size` flag in the Store API has a default value of 20 and a max value of 100.
 
 ### Node configuration
 Find details [here](https://github.com/waku-org/nwaku/tree/master/docs/operators/how-to/configure-rest-api.md)

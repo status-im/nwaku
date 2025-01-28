@@ -57,7 +57,7 @@ proc getStoreMessagesV3*(
   # Optional cursor fields
   cursor: string = "", # base64-encoded hash
   ascending: string = "",
-  pageSize: string = "",
+  pageSize: string = "20", # default value is 20
 ): RestResponse[StoreQueryResponse] {.
   rest, endpoint: "/store/v3/messages", meth: HttpMethod.MethodGet
 .}

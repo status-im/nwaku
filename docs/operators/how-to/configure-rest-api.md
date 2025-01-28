@@ -1,4 +1,3 @@
-
 # Configure a REST API node
 
 A subset of the node configuration can be used to modify the behaviour of the HTTP REST API.
@@ -21,3 +20,5 @@ Example:
 ```shell
 wakunode2 --rest=true
 ```
+
+The `page_size` flag in the Store API has a default value of 20 and a max value of 100.

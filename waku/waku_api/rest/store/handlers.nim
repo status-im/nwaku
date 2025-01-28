@@ -132,6 +132,14 @@ proc createStoreQuery(
     except CatchableError:
       return err("page size parsing error: " & getCurrentExceptionMsg())
 
+  # Enforce default value of page_size to 20
+  if parsedPagedSize.isNone():
+    parsedPagedSize = some(20)
+
+  # Enforce max value of page_size to 100
+  if parsedPagedSize.get() > 100:
+    parsedPagedSize = some(100)
+
   return ok(
     StoreQueryRequest(
       includeData: parsedIncludeData,
