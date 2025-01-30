@@ -19,6 +19,8 @@ These instructions are generic. For more detailed instructions, see the Waku sou
 
 The standard developer tools, including a C compiler, GNU Make, Bash, and Git. More information on these installations can be found [here](https://docs.waku.org/guides/nwaku/build-source#install-dependencies).
 
+> In some distributions (Fedora linux for example), you may need to install `which` utility separately. Nimbus build system is relying on it.
+
 ### Wakunode
 
 ```bash
@@ -51,7 +53,7 @@ If you encounter difficulties building the project on WSL, consider placing the 
 ### How to Build & Run ( Windows )
 
 Note: This is a work in progress. The current setup procedure is as follows:
-Goal: Get rid of windows specific procedures and make the build process the same as linux/macos. 
+Goal: Get rid of windows specific procedures and make the build process the same as linux/macos.
 
 The current setup procedure is as follows:
 
