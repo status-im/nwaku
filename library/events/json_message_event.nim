@@ -59,7 +59,7 @@ proc `%`*(value: Base64String): JsonNode =
 
 type JsonMessageEvent* = ref object of JsonEvent
   pubsubTopic*: string
-  messageHash*: WakuMessageHash
+  messageHash*: string
   wakuMessage*: JsonMessage
 
 proc new*(T: type JsonMessageEvent, pubSubTopic: string, msg: WakuMessage): T =
@@ -83,7 +83,7 @@ proc new*(T: type JsonMessageEvent, pubSubTopic: string, msg: WakuMessage): T =
   return JsonMessageEvent(
     eventType: "message",
     pubSubTopic: pubSubTopic,
-    messageHash: msgHash,
+    messageHash: msgHash.to0xHex(),
     wakuMessage: JsonMessage(
       payload: base64.encode(payload),
       contentTopic: msg.contentTopic,

@@ -1,6 +1,6 @@
 {.push raises: [].}
 
-import std/sequtils, stew/[byteutils, endians2, arrayops], nimcrypto/sha2
+import std/sequtils, stew/[byteutils, endians2, arrayops], nimcrypto/sha2, results
 import ../topics, ./message
 
 ## 14/WAKU2-MESSAGE: Deterministic message hashing
@@ -34,6 +34,16 @@ converter toBytesArray*(digest: MDigest[256]): WakuMessageHash =
 
 converter toBytes*(digest: MDigest[256]): seq[byte] =
   toSeq(digest.data)
+
+proc hexToHash*(hexString: string): Result[WakuMessageHash, string] =
+  var hash: WakuMessageHash
+
+  try:
+    hash = hexString.hexToSeqByte().fromBytes()
+  except ValueError as e:
+    return err("Exception converting hex string to hash: " & e.msg)
+
+  return ok(hash)
 
 proc computeMessageHash*(pubsubTopic: PubsubTopic, msg: WakuMessage): WakuMessageHash =
   var ctx: sha256

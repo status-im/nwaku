@@ -18,19 +18,22 @@ Json.setWriter JsonWriter, PreferredOutput = string
 #### Type conversion
 
 proc parseHash*(input: Option[string]): Result[Option[WakuMessageHash], string] =
-  let base64UrlEncoded =
+  let hexUrlEncoded =
     if input.isSome():
       input.get()
     else:
       return ok(none(WakuMessageHash))
 
-  if base64UrlEncoded == "":
+  if hexUrlEncoded == "":
     return ok(none(WakuMessageHash))
 
-  let base64Encoded = decodeUrl(base64UrlEncoded, false)
+  let hexDecoded = decodeUrl(hexUrlEncoded, false)
 
-  let decodedBytes = base64.decode(Base64String(base64Encoded)).valueOr:
-    return err("waku message hash parsing error: " & error)
+  var decodedBytes: seq[byte]
+  try:
+    decodedBytes = hexToSeqByte(hexDecoded)
+  except ValueError as e:
+    return err("Exception converting hex string to bytes: " & e.msg)
 
   if decodedBytes.len != 32:
     return
@@ -58,12 +61,12 @@ proc parseHashes*(input: Option[string]): Result[seq[WakuMessageHash], string] =
   return ok(hashes)
 
 # Converts a given MessageDigest object into a suitable
-# Base64-URL-encoded string suitable to be transmitted in a Rest
-# request-response. The MessageDigest is first base64 encoded
+# Hex-URL-encoded string suitable to be transmitted in a Rest
+# request-response. The MessageDigest is first hex encoded
 # and this result is URL-encoded.
 proc toRestStringWakuMessageHash*(self: WakuMessageHash): string =
-  let base64Encoded = base64.encode(self)
-  encodeUrl($base64Encoded, false)
+  let hexEncoded = self.to0xHex()
+  encodeUrl(hexEncoded, false)
 
 ## WakuMessage serde
 
@@ -147,14 +150,14 @@ proc readValue*(
     proof: proof,
   )
 
-## WakuMessageKeyValue serde
+## WakuMessageKeyValueHex serde
 
 proc writeValue*(
-    writer: var JsonWriter, value: WakuMessageKeyValue
+    writer: var JsonWriter, value: WakuMessageKeyValueHex
 ) {.gcsafe, raises: [IOError].} =
   writer.beginRecord()
 
-  writer.writeField("messageHash", base64.encode(value.messageHash))
+  writer.writeField("messageHash", value.messageHash)
 
   if value.message.isSome():
     writer.writeField("message", value.message.get())
@@ -165,10 +168,10 @@ proc writeValue*(
   writer.endRecord()
 
 proc readValue*(
-    reader: var JsonReader, value: var WakuMessageKeyValue
+    reader: var JsonReader, value: var WakuMessageKeyValueHex
 ) {.gcsafe, raises: [SerializationError, IOError].} =
   var
-    messageHash = none(WakuMessageHash)
+    messageHash = none(string)
     message = none(WakuMessage)
     pubsubTopic = none(PubsubTopic)
 
@@ -177,22 +180,19 @@ proc readValue*(
     of "messageHash":
       if messageHash.isSome():
         reader.raiseUnexpectedField(
-          "Multiple `messageHash` fields found", "WakuMessageKeyValue"
+          "Multiple `messageHash` fields found", "WakuMessageKeyValueHex"
         )
-      let base64String = reader.readValue(Base64String)
-      let bytes = base64.decode(base64String).valueOr:
-        reader.raiseUnexpectedField("Failed decoding data", "messageHash")
-      messageHash = some(fromBytes(bytes))
+      messageHash = some(reader.readValue(string))
     of "message":
       if message.isSome():
         reader.raiseUnexpectedField(
-          "Multiple `message` fields found", "WakuMessageKeyValue"
+          "Multiple `message` fields found", "WakuMessageKeyValueHex"
         )
       message = some(reader.readValue(WakuMessage))
     of "pubsubTopic":
       if pubsubTopic.isSome():
         reader.raiseUnexpectedField(
-          "Multiple `pubsubTopic` fields found", "WakuMessageKeyValue"
+          "Multiple `pubsubTopic` fields found", "WakuMessageKeyValueHex"
         )
       pubsubTopic = some(reader.readValue(string))
     else:
@@ -201,14 +201,14 @@ proc readValue*(
   if messageHash.isNone():
     reader.raiseUnexpectedValue("Field `messageHash` is missing")
 
-  value = WakuMessageKeyValue(
+  value = WakuMessageKeyValueHex(
     messageHash: messageHash.get(), message: message, pubsubTopic: pubsubTopic
   )
 
 ## StoreQueryResponse serde
 
 proc writeValue*(
-    writer: var JsonWriter, value: StoreQueryResponse
+    writer: var JsonWriter, value: StoreQueryResponseHex
 ) {.gcsafe, raises: [IOError].} =
   writer.beginRecord()
 
@@ -218,55 +218,52 @@ proc writeValue*(
   writer.writeField("messages", value.messages)
 
   if value.paginationCursor.isSome():
-    writer.writeField("paginationCursor", base64.encode(value.paginationCursor.get()))
+    writer.writeField("paginationCursor", value.paginationCursor.get())
 
   writer.endRecord()
 
 proc readValue*(
-    reader: var JsonReader, value: var StoreQueryResponse
+    reader: var JsonReader, value: var StoreQueryResponseHex
 ) {.gcsafe, raises: [SerializationError, IOError].} =
   var
     requestId = none(string)
     code = none(uint32)
     desc = none(string)
-    messages = none(seq[WakuMessageKeyValue])
-    cursor = none(WakuMessageHash)
+    messages = none(seq[WakuMessageKeyValueHex])
+    cursor = none(string)
 
   for fieldName in readObjectFields(reader):
     case fieldName
     of "requestId":
       if requestId.isSome():
         reader.raiseUnexpectedField(
-          "Multiple `requestId` fields found", "StoreQueryResponse"
+          "Multiple `requestId` fields found", "StoreQueryResponseHex"
         )
       requestId = some(reader.readValue(string))
     of "statusCode":
       if code.isSome():
         reader.raiseUnexpectedField(
-          "Multiple `statusCode` fields found", "StoreQueryResponse"
+          "Multiple `statusCode` fields found", "StoreQueryResponseHex"
         )
       code = some(reader.readValue(uint32))
     of "statusDesc":
       if desc.isSome():
         reader.raiseUnexpectedField(
-          "Multiple `statusDesc` fields found", "StoreQueryResponse"
+          "Multiple `statusDesc` fields found", "StoreQueryResponseHex"
         )
       desc = some(reader.readValue(string))
     of "messages":
       if messages.isSome():
         reader.raiseUnexpectedField(
-          "Multiple `messages` fields found", "StoreQueryResponse"
+          "Multiple `messages` fields found", "StoreQueryResponseHex"
         )
-      messages = some(reader.readValue(seq[WakuMessageKeyValue]))
+      messages = some(reader.readValue(seq[WakuMessageKeyValueHex]))
     of "paginationCursor":
       if cursor.isSome():
         reader.raiseUnexpectedField(
-          "Multiple `paginationCursor` fields found", "StoreQueryResponse"
+          "Multiple `paginationCursor` fields found", "StoreQueryResponseHex"
         )
-      let base64String = reader.readValue(Base64String)
-      let bytes = base64.decode(base64String).valueOr:
-        reader.raiseUnexpectedField("Failed decoding data", "paginationCursor")
-      cursor = some(fromBytes(bytes))
+      cursor = some(reader.readValue(string))
     else:
       reader.raiseUnexpectedField("Unrecognided field", cstring(fieldName))
 
@@ -282,7 +279,7 @@ proc readValue*(
   if messages.isNone():
     reader.raiseUnexpectedValue("Field `messages` is missing")
 
-  value = StoreQueryResponse(
+  value = StoreQueryResponseHex(
     requestId: requestId.get(),
     statusCode: code.get(),
     statusDesc: desc.get(),

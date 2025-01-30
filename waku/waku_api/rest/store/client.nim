@@ -15,12 +15,12 @@ logScope:
   topics = "waku node rest store_api"
 
 proc decodeBytes*(
-    t: typedesc[StoreQueryResponse],
+    t: typedesc[StoreQueryResponseHex],
     data: openArray[byte],
     contentType: Opt[ContentTypeData],
-): RestResult[StoreQueryResponse] =
+): RestResult[StoreQueryResponseHex] =
   if MediaType.init($contentType) == MIMETYPE_JSON:
-    let decoded = ?decodeFromJsonBytes(StoreQueryResponse, data)
+    let decoded = ?decodeFromJsonBytes(StoreQueryResponseHex, data)
     return ok(decoded)
 
   if MediaType.init($contentType) == MIMETYPE_TEXT:
@@ -30,11 +30,11 @@ proc decodeBytes*(
       copyMem(addr res[0], unsafeAddr data[0], len(data))
 
     return ok(
-      StoreQueryResponse(
+      StoreQueryResponseHex(
         statusCode: uint32(ErrorCode.BAD_RESPONSE),
         statusDesc: res,
-        messages: newSeq[WakuMessageKeyValue](0),
-        paginationCursor: none(WakuMessageHash),
+        messages: newSeq[WakuMessageKeyValueHex](0),
+        paginationCursor: none(string),
       )
     )
 
@@ -58,6 +58,6 @@ proc getStoreMessagesV3*(
   cursor: string = "", # base64-encoded hash
   ascending: string = "",
   pageSize: string = "",
-): RestResponse[StoreQueryResponse] {.
+): RestResponse[StoreQueryResponseHex] {.
   rest, endpoint: "/store/v3/messages", meth: HttpMethod.MethodGet
 .}

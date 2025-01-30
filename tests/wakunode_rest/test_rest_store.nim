@@ -74,7 +74,8 @@ procSuite "Waku Rest API - Store v3":
       messageHash == parsedMsgHashRes.get().get()
 
     # Random validation. Obtained the raw values manually
-    let expected = some("f6za9OzG1xSiEZagZc2b3litRbkd3zRl61rezDd3pgQ%3D")
+    let expected =
+      some("0x9e0ea917677a3d2b8610b0126986d89824b6acf76008b5fb9aa8b99ac906c1a7")
 
     let msgHashRes = parseHash(expected)
     assert msgHashRes.isOk(), $msgHashRes.error
@@ -147,7 +148,7 @@ procSuite "Waku Rest API - Store v3":
       "", # start time
       "", # end time
       "", # hashes
-      encodedCursor, # base64-encoded hash
+      encodedCursor, # hex-encoded hash
       "true", # ascending
       "5", # empty implies default page size
     )
@@ -217,7 +218,7 @@ procSuite "Waku Rest API - Store v3":
       "3", # start time
       "6", # end time
       "", # hashes
-      "", # base64-encoded hash
+      "", # hex-encoded hash
       "true", # ascending
       "", # empty implies default page size
     )
@@ -283,7 +284,7 @@ procSuite "Waku Rest API - Store v3":
 
     var pages = newSeq[seq[WakuMessage]](2)
 
-    var reqHash = none(WakuMessageHash)
+    var reqHash = none(string)
 
     for i in 0 ..< 2:
       let response = await client.getStoreMessagesV3(
@@ -295,9 +296,9 @@ procSuite "Waku Rest API - Store v3":
         "", # end time. Empty ignores the field.
         "", # hashes
         if reqHash.isSome():
-          reqHash.get().toRestStringWakuMessageHash()
+          reqHash.get()
         else:
-          "", # base64-encoded digest. Empty ignores the field.
+          "", # hex-encoded digest. Empty ignores the field.
         "true", # ascending
         "7", # page size. Empty implies default page size.
       )
@@ -775,7 +776,7 @@ procSuite "Waku Rest API - Store v3":
     var pages = newSeq[seq[WakuMessage]](2)
 
     var reqPubsubTopic = DefaultPubsubTopic
-    var reqHash = none(WakuMessageHash)
+    var reqHash = none(string)
 
     for i in 0 ..< 2:
       let response = await client.getStoreMessagesV3(
@@ -787,9 +788,9 @@ procSuite "Waku Rest API - Store v3":
         "", # end time. Empty ignores the field.
         "", # hashes
         if reqHash.isSome():
-          reqHash.get().toRestStringWakuMessageHash()
+          reqHash.get()
         else:
-          "", # base64-encoded digest. Empty ignores the field.
+          "", # hex-encoded digest. Empty ignores the field.
         "true", # ascending
         "3", # page size. Empty implies default page size.
       )
@@ -823,9 +824,9 @@ procSuite "Waku Rest API - Store v3":
       "", # end time. Empty ignores the field.
       "", # hashes
       if reqHash.isSome():
-        reqHash.get().toRestStringWakuMessageHash()
+        reqHash.get()
       else:
-        "", # base64-encoded digest. Empty ignores the field.
+        "", # hex-encoded digest. Empty ignores the field.
     )
 
     check:
@@ -845,9 +846,9 @@ procSuite "Waku Rest API - Store v3":
       "", # end time. Empty ignores the field.
       "", # hashes
       if reqHash.isSome():
-        reqHash.get().toRestStringWakuMessageHash()
+        reqHash.get()
       else:
-        "", # base64-encoded digest. Empty ignores the field.
+        "", # hex-encoded digest. Empty ignores the field.
       "true", # ascending
       "5", # page size. Empty implies default page size.
     )

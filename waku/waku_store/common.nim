@@ -1,6 +1,6 @@
 {.push raises: [].}
 
-import std/[options], results
+import std/[options, sequtils], results, stew/byteutils
 import ../waku_core, ../common/paging
 
 from ../waku_core/codecs import WakuStoreCodec
@@ -47,6 +47,22 @@ type
     messages*: seq[WakuMessageKeyValue]
 
     paginationCursor*: Option[WakuMessageHash]
+
+  # Types to be used by clients that use the hash in hex
+  WakuMessageKeyValueHex* = object
+    messageHash*: string
+    message*: Option[WakuMessage]
+    pubsubTopic*: Option[PubsubTopic]
+
+  StoreQueryResponseHex* = object
+    requestId*: string
+
+    statusCode*: uint32
+    statusDesc*: string
+
+    messages*: seq[WakuMessageKeyValueHex]
+
+    paginationCursor*: Option[string]
 
   StatusCode* {.pure.} = enum
     UNKNOWN = uint32(000)
@@ -117,3 +133,24 @@ proc `$`*(err: StoreError): string =
     "SERVICE_UNAVAILABLE"
   of ErrorCode.UNKNOWN:
     "UNKNOWN"
+
+proc toHex*(messageData: WakuMessageKeyValue): WakuMessageKeyValueHex =
+  WakuMessageKeyValueHex(
+    messageHash: messageData.messageHash.to0xHex(),
+      # Assuming WakuMessageHash has a toHex method
+    message: messageData.message,
+    pubsubTopic: messageData.pubsubTopic,
+  )
+
+proc toHex*(response: StoreQueryResponse): StoreQueryResponseHex =
+  StoreQueryResponseHex(
+    requestId: response.requestId,
+    statusCode: response.statusCode,
+    statusDesc: response.statusDesc,
+    messages: response.messages.mapIt(it.toHex()), # Convert each message to hex
+    paginationCursor:
+      if response.paginationCursor.isSome:
+        some(response.paginationCursor.get().to0xHex())
+      else:
+        none[string](),
+  )

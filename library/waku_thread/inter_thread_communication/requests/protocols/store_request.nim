@@ -1,5 +1,5 @@
 import std/[json, sugar, strutils, options]
-import chronos, chronicles, results
+import chronos, chronicles, results, stew/byteutils
 import
   ../../../../../waku/factory/waku,
   ../../../../alloc,
@@ -27,16 +27,12 @@ func fromJsonNode(
     for cTopic in jsonContent["content_topics"].getElems():
       cTopic.getStr()
 
-  let msgHashes = collect(newSeq):
-    if jsonContent.contains("message_hashes"):
-      for hashJsonObj in jsonContent["message_hashes"].getElems():
-        var hash: WakuMessageHash
-        var count: int = 0
-        for byteValue in hashJsonObj.getElems():
-          hash[count] = byteValue.getInt().byte
-          count.inc()
-
-        hash
+  var msgHashes: seq[WakuMessageHash]
+  if jsonContent.contains("message_hashes"):
+    for hashJsonObj in jsonContent["message_hashes"].getElems():
+      let hash = hashJsonObj.getStr().hexToHash().valueOr:
+          return err("Failed converting message hash hex string to bytes: " & error)
+      msgHashes.add(hash)
 
   let pubsubTopic =
     if jsonContent.contains("pubsub_topic"):
@@ -46,12 +42,9 @@ func fromJsonNode(
 
   let paginationCursor =
     if jsonContent.contains("pagination_cursor"):
-      var hash: WakuMessageHash
-      var count: int = 0
-      for byteValue in jsonContent["pagination_cursor"].getElems():
-        hash[count] = byteValue.getInt().byte
-        count.inc()
-
+      let hash = jsonContent["pagination_cursor"].getStr().hexToHash().valueOr:
+          return
+            err("Failed converting pagination_cursor hex string to bytes: " & error)
       some(hash)
     else:
       none(WakuMessageHash)
@@ -120,7 +113,8 @@ proc process_remote_query(
   let queryResponse = (await waku.node.wakuStoreClient.query(storeQueryRequest, peer)).valueOr:
     return err("StoreRequest failed store query: " & $error)
 
-  return ok($(%*queryResponse)) ## returning the response in json format
+  let res = $(%*(queryResponse.toHex()))
+  return ok(res) ## returning the response in json format
 
 proc process*(
     self: ptr StoreRequest, waku: ptr Waku

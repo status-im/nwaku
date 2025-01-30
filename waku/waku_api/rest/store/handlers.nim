@@ -42,7 +42,7 @@ proc performStoreQuery(
     error msg, error = futRes.error
     return RestApiResponse.internalServerError(fmt("{msg} [{futRes.error}]"))
 
-  let res = futRes.get()
+  let res = futRes.get().toHex()
 
   if res.statusCode == uint32(ErrorCode.TOO_MANY_REQUESTS):
     debug "Request rate limit reached on peer ", storePeer
@@ -165,7 +165,7 @@ proc retrieveMsgsFromSelfNode(
   let storeResp = (await self.wakuStore.handleSelfStoreRequest(storeQuery)).valueOr:
     return RestApiResponse.internalServerError($error)
 
-  let resp = RestApiResponse.jsonResponse(storeResp, status = Http200).valueOr:
+  let resp = RestApiResponse.jsonResponse(storeResp.toHex(), status = Http200).valueOr:
     const msg = "Error building the json respose"
     let e = $error
     error msg, error = e
