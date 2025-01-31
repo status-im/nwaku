@@ -646,15 +646,6 @@ proc onPeerMetadata(pm: PeerManager, peerId: PeerId) {.async.} =
   asyncSpawn(pm.switch.disconnect(peerId))
   pm.wakuPeerStore.delete(peerId)
 
-# called when a connection i) is created or ii) is closed
-proc onConnEvent(pm: PeerManager, peerId: PeerID, event: ConnEvent) {.async.} =
-  case event.kind
-  of ConnEventKind.Connected:
-    #let direction = if event.incoming: Inbound else: Outbound
-    discard
-  of ConnEventKind.Disconnected:
-    discard
-
 # called when a peer i) first connects to us ii) disconnects all connections from us
 proc onPeerEvent(pm: PeerManager, peerId: PeerId, event: PeerEvent) {.async.} =
   if not pm.wakuMetadata.isNil() and event.kind == PeerEventKind.Joined:
@@ -1041,18 +1032,11 @@ proc new*(
     shardedPeerManagement: shardedPeerManagement,
   )
 
-  proc connHook(peerId: PeerID, event: ConnEvent): Future[void] {.gcsafe.} =
-    onConnEvent(pm, peerId, event)
-
   proc peerHook(peerId: PeerId, event: PeerEvent): Future[void] {.gcsafe.} =
     onPeerEvent(pm, peerId, event)
 
   proc peerStoreChanged(peerId: PeerId) {.gcsafe.} =
     waku_peer_store_size.set(toSeq(pm.wakuPeerStore[AddressBook].book.keys).len.int64)
-
-  # currently disabled
-  #pm.switch.addConnEventHandler(connHook, ConnEventKind.Connected)
-  #pm.switch.addConnEventHandler(connHook, ConnEventKind.Disconnected)
 
   pm.switch.addPeerEventHandler(peerHook, PeerEventKind.Joined)
   pm.switch.addPeerEventHandler(peerHook, PeerEventKind.Left)
