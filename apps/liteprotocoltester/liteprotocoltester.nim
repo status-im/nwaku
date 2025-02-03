@@ -99,7 +99,6 @@ when isMainModule:
   wakuConf.dnsAddrs = true
   wakuConf.dnsAddrsNameServers = @[parseIpAddress("8.8.8.8"), parseIpAddress("1.1.1.1")]
 
-  wakuConf.pubsubTopics = conf.pubsubTopics
   wakuConf.contentTopics = conf.contentTopics
   wakuConf.clusterId = conf.clusterId
   ## TODO: Depending on the tester needs we might extend here with shards, clusterId, etc...

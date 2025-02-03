@@ -190,30 +190,6 @@ proc new*(
 
   logging.setupLog(confCopy.logLevel, confCopy.logFormat)
 
-  # TODO: remove after pubsubtopic config gets removed
-  var shards = newSeq[uint16]()
-  if confCopy.pubsubTopics.len > 0:
-    let shardsRes = topicsToRelayShards(confCopy.pubsubTopics)
-    if shardsRes.isErr():
-      error "failed to parse pubsub topic, please format according to static shard specification",
-        error = shardsRes.error
-      return err("failed to parse pubsub topic: " & $shardsRes.error)
-
-    let shardsOpt = shardsRes.get()
-
-    if shardsOpt.isSome():
-      let relayShards = shardsOpt.get()
-      if relayShards.clusterId != confCopy.clusterId:
-        error "clusterId of the pubsub topic should match the node's cluster. e.g. --pubsub-topic=/waku/2/rs/22/1 and --cluster-id=22",
-          nodeCluster = confCopy.clusterId, pubsubCluster = relayShards.clusterId
-        return err(
-          "clusterId of the pubsub topic should match the node's cluster. e.g. --pubsub-topic=/waku/2/rs/22/1 and --cluster-id=22"
-        )
-
-      for shard in relayShards.shardIds:
-        shards.add(shard)
-      confCopy.shards = shards
-
   case confCopy.clusterId
 
   # cluster-id=1 (aka The Waku Network)

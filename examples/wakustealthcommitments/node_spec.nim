@@ -26,10 +26,6 @@ proc setup*(): Waku =
   var conf = confRes.get()
 
   let twnClusterConf = ClusterConf.TheWakuNetworkConf()
-  if len(conf.shards) != 0:
-    conf.pubsubTopics = conf.shards.mapIt(twnClusterConf.pubsubTopics[it.uint16])
-  else:
-    conf.pubsubTopics = twnClusterConf.pubsubTopics
 
   # Override configuration
   conf.maxMessageSize = twnClusterConf.maxMessageSize
