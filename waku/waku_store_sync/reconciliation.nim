@@ -87,6 +87,46 @@ proc messageIngress*(self: SyncReconciliation, id: SyncID) =
   self.storage.insert(id).isOkOr:
     error "failed to insert new message", msg_hash = id.hash.toHex(), err = error
 
+proc preProcessPayload(
+    self: SyncReconciliation, payload: RangesData
+): Option[RangesData] =
+  ## Check the received payload for cluster, shards and/or time mismatch.
+
+  var payload = payload
+
+  if self.cluster != payload.cluster:
+    return none(RangesData)
+
+  let shardsIntersection = self.shards * payload.shards.toPackedSet()
+
+  if shardsIntersection.len < 1:
+    return none(RangesData)
+
+  payload.shards = shardsIntersection.toSeq()
+
+  let timeRange = calculateTimeRange(self.relayJitter, self.syncRange)
+  let selfLowerBound = timeRange.a
+
+  # for non skip ranges check if they happen before any of our ranges
+  # convert to skip range in that case
+  for i in 0 ..< payload.ranges.len:
+    let rangeType = payload.ranges[i][1]
+    if rangeType != RangeType.Skip:
+      continue
+
+    let upperBound = payload.ranges[i][0].b.time
+    if selfLowerBound > upperBound:
+      payload.ranges[i][1] = RangeType.Skip
+
+      if rangeType == RangeType.Fingerprint:
+        payload.fingerprints.delete(0)
+      elif rangeType == RangeType.ItemSet:
+        payload.itemSets.delete(0)
+    else:
+      break
+
+  return some(payload)
+
 proc processRequest(
     self: SyncReconciliation, conn: Connection
 ): Future[Result[void, string]] {.async.} =
@@ -120,10 +160,12 @@ proc processRequest(
       sendPayload: RangesData
       rawPayload: seq[byte]
 
-    # Only process the ranges IF the shards and cluster matches
-    if self.cluster == recvPayload.cluster and
-        recvPayload.shards.toPackedSet() == self.shards:
-      sendPayload = self.storage.processPayload(recvPayload, hashToSend, hashToRecv)
+    let preProcessedPayloadRes = self.preProcessPayload(recvPayload)
+    if preProcessedPayloadRes.isSome():
+      let preProcessedPayload = preProcessedPayloadRes.get()
+
+      sendPayload =
+        self.storage.processPayload(preProcessedPayload, hashToSend, hashToRecv)
 
       sendPayload.cluster = self.cluster
       sendPayload.shards = self.shards.toSeq()

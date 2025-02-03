@@ -1,4 +1,5 @@
-import std/[algorithm, sequtils, math, options], results, chronos, stew/arrayops
+import
+  std/[algorithm, sequtils, math, options, packedsets], results, chronos, stew/arrayops
 
 import
   ../../waku_core/time,
@@ -9,6 +10,7 @@ import
 
 type SeqStorage* = ref object of SyncStorage
   elements: seq[SyncID]
+  shards: seq[uint16]
 
   # Numer of parts a range will be splitted into.
   partitionCount: int
@@ -66,7 +68,7 @@ method prune*(self: SeqStorage, timestamp: Timestamp): int {.raises: [].} =
   return idx
 
 proc computefingerprintFromSlice(
-    self: SeqStorage, sliceOpt: Option[Slice[int]]
+    self: SeqStorage, sliceOpt: Option[Slice[int]], shardSet: PackedSet[uint16]
 ): Fingerprint =
   ## XOR all hashes of a slice of the storage.
 
@@ -77,7 +79,15 @@ proc computefingerprintFromSlice(
 
   let idxSlice = sliceOpt.get()
 
-  for id in self.elements[idxSlice]:
+  let slice = self.elements[idxSlice]
+
+  for i in 0 ..< slice.len:
+    let id = slice[i]
+    let shard = self.shards[i]
+
+    if not shardSet.contains(shard):
+      continue
+
     fingerprint = fingerprint xor id.hash
 
   return fingerprint
@@ -101,21 +111,22 @@ proc findIdxBounds(self: SeqStorage, slice: Slice[SyncID]): Option[Slice[int]] =
   return some(lower ..< upper)
 
 method computeFingerprint*(
-    self: SeqStorage, bounds: Slice[SyncID]
+    self: SeqStorage, bounds: Slice[SyncID], shardSet: PackedSet[uint16]
 ): Fingerprint {.raises: [].} =
   let idxSliceOpt = self.findIdxBounds(bounds)
-  return self.computefingerprintFromSlice(idxSliceOpt)
+  return self.computefingerprintFromSlice(idxSliceOpt, shardSet)
 
 proc processFingerprintRange*(
     self: SeqStorage,
     inputBounds: Slice[SyncID],
+    shardSet: PackedSet[uint16],
     inputFingerprint: Fingerprint,
     output: var RangesData,
 ) {.raises: [].} =
   ## Compares fingerprints and partition new ranges.
 
   let idxSlice = self.findIdxBounds(inputBounds)
-  let ourFingerprint = self.computeFingerprintFromSlice(idxSlice)
+  let ourFingerprint = self.computeFingerprintFromSlice(idxSlice, shardSet)
 
   if ourFingerprint == inputFingerprint:
     output.ranges.add((inputBounds, RangeType.Skip))
@@ -153,7 +164,7 @@ proc processFingerprintRange*(
       output.itemSets.add(state)
       continue
 
-    let fingerprint = self.computeFingerprintFromSlice(some(slice))
+    let fingerprint = self.computeFingerprintFromSlice(some(slice), shardSet)
     output.ranges.add((partitionBounds, RangeType.Fingerprint))
     output.fingerprints.add(fingerprint)
     continue
@@ -161,6 +172,7 @@ proc processFingerprintRange*(
 proc processItemSetRange*(
     self: SeqStorage,
     inputBounds: Slice[SyncID],
+    shardSet: PackedSet[uint16],
     inputItemSet: ItemSet,
     hashToSend: var seq[Fingerprint],
     hashToRecv: var seq[Fingerprint],
@@ -190,6 +202,10 @@ proc processItemSetRange*(
 
   while (j < m):
     let ourElement = self.elements[j]
+    let shard = self.shards[j]
+
+    if not shardSet.contains(shard):
+      continue
 
     if i >= n:
       # in case we have more elements
@@ -234,6 +250,8 @@ method processPayload*(
     i = 0
     j = 0
 
+  let shardSet = input.shards.toPackedSet()
+
   for (bounds, rangeType) in input.ranges:
     case rangeType
     of RangeType.Skip:
@@ -244,14 +262,16 @@ method processPayload*(
       let fingerprint = input.fingerprints[i]
       i.inc()
 
-      self.processFingerprintRange(bounds, fingerprint, output)
+      self.processFingerprintRange(bounds, shardSet, fingerprint, output)
 
       continue
     of RangeType.ItemSet:
       let itemSet = input.itemsets[j]
       j.inc()
 
-      self.processItemSetRange(bounds, itemSet, hashToSend, hashToRecv, output)
+      self.processItemSetRange(
+        bounds, shardSet, itemSet, hashToSend, hashToRecv, output
+      )
 
       continue
 
