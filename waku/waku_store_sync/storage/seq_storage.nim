@@ -21,34 +21,42 @@ type SeqStorage* = ref object of SyncStorage
 method length*(self: SeqStorage): int =
   return self.elements.len
 
-method insert*(self: SeqStorage, element: SyncID): Result[void, string] {.raises: [].} =
+method insert*(
+    self: SeqStorage, element: SyncID, shard: uint16
+): Result[void, string] {.raises: [].} =
   let idx = self.elements.lowerBound(element, common.cmp)
 
   if idx < self.elements.len and self.elements[idx] == element:
     return err("duplicate element")
 
   self.elements.insert(element, idx)
+  self.shards.insert(shard, idx)
 
   return ok()
 
 method batchInsert*(
-    self: SeqStorage, elements: seq[SyncID]
+    self: SeqStorage, elements: seq[SyncID], shards: seq[uint16]
 ): Result[void, string] {.raises: [].} =
   ## Insert the sorted seq of new elements.
 
   if elements.len == 1:
-    return self.insert(elements[0])
-
-  #TODO custom impl. ???
+    return self.insert(elements[0], shards[0])
 
   if not elements.isSorted(common.cmp):
     return err("seq not sorted")
 
-  var merged = newSeqOfCap[SyncID](self.elements.len + elements.len)
+  var idx = 0
+  for i in 0 ..< elements.len:
+    let element = elements[i]
+    let shard = shards[i]
 
-  merged.merge(self.elements, elements, common.cmp)
+    idx = self.elements[idx ..< self.elements.len].lowerBound(element, common.cmp)
 
-  self.elements = merged.deduplicate(true)
+    if self.elements[idx] == element:
+      continue
+
+    self.elements.insert(element, idx)
+    self.shards.insert(shard, idx)
 
   return ok()
 
@@ -64,6 +72,7 @@ method prune*(self: SeqStorage, timestamp: Timestamp): int {.raises: [].} =
   let idx = self.elements.lowerBound(bound, common.cmp)
 
   self.elements.delete(0 ..< idx)
+  self.shards.delete(0 ..< idx)
 
   return idx
 
@@ -79,11 +88,12 @@ proc computefingerprintFromSlice(
 
   let idxSlice = sliceOpt.get()
 
-  let slice = self.elements[idxSlice]
+  let elementSlice = self.elements[idxSlice]
+  let shardSlice = self.shards[idxSlice]
 
-  for i in 0 ..< slice.len:
-    let id = slice[i]
-    let shard = self.shards[i]
+  for i in 0 ..< elementSlice.len:
+    let id = elementSlice[i]
+    let shard = shardSlice[i]
 
     if not shardSet.contains(shard):
       continue
@@ -315,8 +325,15 @@ proc new*(T: type SeqStorage, capacity: int, threshold = 100, partitions = 8): T
   )
 
 proc new*(
-    T: type SeqStorage, elements: seq[SyncID], threshold = 100, partitions = 8
+    T: type SeqStorage,
+    elements: seq[SyncID],
+    shards: seq[uint16],
+    threshold = 100,
+    partitions = 8,
 ): T =
   return SeqStorage(
-    elements: elements, lengthThreshold: threshold, partitionCount: partitions
+    elements: elements,
+    shards: shards,
+    lengthThreshold: threshold,
+    partitionCount: partitions,
   )

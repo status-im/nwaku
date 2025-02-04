@@ -16,6 +16,7 @@ import
   ../common/protobuf,
   ../waku_enr,
   ../waku_core/codecs,
+  ../waku_core/topics/pubsub_topic,
   ../waku_core/message/digest,
   ../waku_core/message/message,
   ../waku_core/message/default_values,
@@ -34,7 +35,7 @@ type SyncTransfer* = ref object of LPProtocol
   peerManager: PeerManager
 
   # Send IDs to reconciliation protocol for storage
-  idsTx: AsyncQueue[SyncID]
+  idsTx: AsyncQueue[(SyncID, uint16)]
 
   # Receive Hashes from reconciliation protocol for reception
   localWantsRx: AsyncQueue[(PeerId, WakuMessageHash)]
@@ -168,7 +169,15 @@ proc initProtocolHandler(self: SyncTransfer) =
         continue
 
       let id = SyncID(time: msg.timestamp, hash: hash)
-      await self.idsTx.addLast(id)
+
+      let parseRes = RelayShard.parse(pubsub)
+      if parseRes.isErr():
+        error "failed to parse pubsub topic", pubsubTopic = pubsub
+        continue
+
+      let shard = parseRes.get().shardId
+
+      await self.idsTx.addLast((id, shard))
 
       continue
 
@@ -184,7 +193,7 @@ proc new*(
     T: type SyncTransfer,
     peerManager: PeerManager,
     wakuArchive: WakuArchive,
-    idsTx: AsyncQueue[SyncID],
+    idsTx: AsyncQueue[(SyncID, uint16)],
     localWantsRx: AsyncQueue[(PeerId, WakuMessageHash)],
     remoteNeedsRx: AsyncQueue[(PeerId, WakuMessageHash)],
 ): T =

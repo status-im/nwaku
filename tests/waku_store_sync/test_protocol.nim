@@ -30,7 +30,7 @@ suite "Waku Sync: reconciliation":
   var clientSwitch {.threadvar.}: Switch
 
   var
-    idsChannel {.threadvar.}: AsyncQueue[SyncID]
+    idsChannel {.threadvar.}: AsyncQueue[(SyncID, uint16)]
     localWants {.threadvar.}: AsyncQueue[(PeerId, WakuMessageHash)]
     remoteNeeds {.threadvar.}: AsyncQueue[(PeerId, WakuMessageHash)]
 
@@ -46,7 +46,7 @@ suite "Waku Sync: reconciliation":
 
     await allFutures(serverSwitch.start(), clientSwitch.start())
 
-    idsChannel = newAsyncQueue[SyncID]()
+    idsChannel = newAsyncQueue[(SyncID, uint16)]()
     localWants = newAsyncQueue[(PeerId, WakuMessageHash)]()
     remoteNeeds = newAsyncQueue[(PeerId, WakuMessageHash)]()
 
@@ -85,9 +85,9 @@ suite "Waku Sync: reconciliation":
       hash2 = computeMessageHash(pubsubTopic = DefaultPubsubTopic, msg2)
       hash3 = computeMessageHash(pubsubTopic = DefaultPubsubTopic, msg3)
 
-    server.messageIngress(hash1, msg1)
-    server.messageIngress(hash2, msg2)
-    server.messageIngress(hash3, msg3)
+    discard server.messageIngress(hash1, msg1, 1)
+    discard server.messageIngress(hash2, msg2, 1)
+    discard server.messageIngress(hash3, msg3, 1)
 
     check:
       remoteNeeds.contains((clientPeerInfo.peerId, hash1)) == false
@@ -111,9 +111,9 @@ suite "Waku Sync: reconciliation":
       hash2 = computeMessageHash(pubsubTopic = DefaultPubsubTopic, msg2)
       hash3 = computeMessageHash(pubsubTopic = DefaultPubsubTopic, msg3)
 
-    client.messageIngress(hash1, msg1)
-    client.messageIngress(hash2, msg2)
-    client.messageIngress(hash3, msg3)
+    discard client.messageIngress(hash1, msg1, 1)
+    discard client.messageIngress(hash2, msg2, 1)
+    discard client.messageIngress(hash3, msg3, 1)
 
     check:
       remoteNeeds.contains((serverPeerInfo.peerId, hash1)) == false
@@ -137,10 +137,10 @@ suite "Waku Sync: reconciliation":
       hash2 = computeMessageHash(DefaultPubsubTopic, msg2)
       hash3 = computeMessageHash(DefaultPubsubTopic, msg3)
 
-    server.messageIngress(hash1, msg1)
-    server.messageIngress(hash2, msg2)
-    client.messageIngress(hash1, msg1)
-    client.messageIngress(hash3, msg3)
+    discard server.messageIngress(hash1, msg1, 1)
+    discard server.messageIngress(hash2, msg2, 1)
+    discard client.messageIngress(hash1, msg1, 1)
+    discard client.messageIngress(hash3, msg3, 1)
 
     check:
       remoteNeeds.contains((serverPeerInfo.peerId, hash3)) == false
@@ -166,10 +166,10 @@ suite "Waku Sync: reconciliation":
       hash2 = computeMessageHash(DefaultPubsubTopic, msg2)
       hash3 = computeMessageHash(DefaultPubsubTopic, msg3)
 
-    server.messageIngress(hash1, msg1)
-    server.messageIngress(hash2, msg2)
-    client.messageIngress(hash1, msg1)
-    client.messageIngress(hash3, msg3)
+    discard server.messageIngress(hash1, msg1, 1)
+    discard server.messageIngress(hash2, msg2, 1)
+    discard client.messageIngress(hash1, msg1, 1)
+    discard client.messageIngress(hash3, msg3, 1)
 
     check:
       remoteNeeds.contains((serverPeerInfo.peerId, hash3)) == false
@@ -198,10 +198,10 @@ suite "Waku Sync: reconciliation":
       hash1 = computeMessageHash(pubsubTopic = DefaultPubsubTopic, msg1)
       hash2 = computeMessageHash(pubsubTopic = DefaultPubsubTopic, msg2)
 
-    server.messageIngress(hash1, msg1)
-    client.messageIngress(hash1, msg1)
-    server.messageIngress(hash2, msg2)
-    client.messageIngress(hash2, msg2)
+    discard server.messageIngress(hash1, msg1, 1)
+    discard client.messageIngress(hash1, msg1, 1)
+    discard server.messageIngress(hash2, msg2, 1)
+    discard client.messageIngress(hash2, msg2, 1)
 
     check:
       localWants.len == 0
@@ -230,10 +230,10 @@ suite "Waku Sync: reconciliation":
       let msg = fakeWakuMessage(ts = timestamp, contentTopic = DefaultContentTopic)
       let hash = computeMessageHash(DefaultPubsubTopic, msg)
 
-      server.messageIngress(hash, msg)
+      discard server.messageIngress(hash, msg, 1)
 
       if i != diffIndex:
-        client.messageIngress(hash, msg)
+        discard client.messageIngress(hash, msg, 1)
       else:
         diff = hash
 
@@ -279,12 +279,12 @@ suite "Waku Sync: reconciliation":
         msg = fakeWakuMessage(ts = timestamp, contentTopic = DefaultContentTopic)
         hash = computeMessageHash(DefaultPubsubTopic, msg)
 
-      server.messageIngress(hash, msg)
+      discard server.messageIngress(hash, msg, 1)
 
       if i in randIndexes:
         diffMsgHashes.incl(hash)
       else:
-        client.messageIngress(hash, msg)
+        discard client.messageIngress(hash, msg, 1)
 
       timestamp += Timestamp(part)
       continue
@@ -313,10 +313,10 @@ suite "Waku Sync: transfer":
     clientArchive {.threadvar.}: WakuArchive
 
   var
-    serverIds {.threadvar.}: AsyncQueue[SyncID]
+    serverIds {.threadvar.}: AsyncQueue[(SyncID, uint16)]
     serverLocalWants {.threadvar.}: AsyncQueue[(PeerId, WakuMessageHash)]
     serverRemoteNeeds {.threadvar.}: AsyncQueue[(PeerId, WakuMessageHash)]
-    clientIds {.threadvar.}: AsyncQueue[SyncID]
+    clientIds {.threadvar.}: AsyncQueue[(SyncID, uint16)]
     clientLocalWants {.threadvar.}: AsyncQueue[(PeerId, WakuMessageHash)]
     clientRemoteNeeds {.threadvar.}: AsyncQueue[(PeerId, WakuMessageHash)]
 
@@ -344,7 +344,7 @@ suite "Waku Sync: transfer":
       serverPeerManager = PeerManager.new(serverSwitch)
       clientPeerManager = PeerManager.new(clientSwitch)
 
-    serverIds = newAsyncQueue[SyncID]()
+    serverIds = newAsyncQueue[(SyncID, uint16)]()
     serverLocalWants = newAsyncQueue[(PeerId, WakuMessageHash)]()
     serverRemoteNeeds = newAsyncQueue[(PeerId, WakuMessageHash)]()
 
@@ -356,7 +356,7 @@ suite "Waku Sync: transfer":
       remoteNeedsRx = serverRemoteNeeds,
     )
 
-    clientIds = newAsyncQueue[SyncID]()
+    clientIds = newAsyncQueue[(SyncID, uint16)]()
     clientLocalWants = newAsyncQueue[(PeerId, WakuMessageHash)]()
     clientRemoteNeeds = newAsyncQueue[(PeerId, WakuMessageHash)]()
 
