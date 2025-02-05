@@ -1,5 +1,8 @@
 import
-  std/[algorithm, sequtils, math, options, packedsets], results, chronos, stew/arrayops
+  std/[algorithm, sequtils, math, options, packedsets, sugar],
+  results,
+  chronos,
+  stew/arrayops
 
 import
   ../../waku_core/time,
@@ -152,7 +155,13 @@ proc processFingerprintRange*(
 
   if slice.len <= self.lengthThreshold:
     output.ranges.add((inputBounds, RangeType.ItemSet))
-    let state = ItemSet(elements: self.elements[slice], reconciled: false)
+
+    let elements = collect(newSeq):
+      for i in slice:
+        if shardSet.contains(self.shards[i]):
+          self.elements[i]
+
+    let state = ItemSet(elements: elements, reconciled: false)
     output.itemSets.add(state)
     return
 
@@ -170,7 +179,13 @@ proc processFingerprintRange*(
 
     if slice.len <= self.lengthThreshold:
       output.ranges.add((partitionBounds, RangeType.ItemSet))
-      let state = ItemSet(elements: self.elements[slice], reconciled: false)
+
+      let elements = collect(newSeq):
+        for i in slice:
+          if shardSet.contains(self.shards[i]):
+            self.elements[i]
+
+      let state = ItemSet(elements: elements, reconciled: false)
       output.itemSets.add(state)
       continue
 
@@ -215,6 +230,7 @@ proc processItemSetRange*(
     let shard = self.shards[j]
 
     if not shardSet.contains(shard):
+      j.inc()
       continue
 
     if i >= n:
@@ -243,7 +259,13 @@ proc processItemSetRange*(
 
   if not inputItemSet.reconciled:
     output.ranges.add((inputBounds, RangeType.ItemSet))
-    let state = ItemSet(elements: self.elements[slice], reconciled: true)
+
+    let elements = collect(newSeq):
+      for i in slice:
+        if shardSet.contains(self.shards[i]):
+          self.elements[i]
+
+    let state = ItemSet(elements: elements, reconciled: true)
     output.itemSets.add(state)
   else:
     output.ranges.add((inputBounds, RangeType.Skip))
