@@ -13,7 +13,6 @@ import
   chronicles,
   metrics,
   libp2p/multihash,
-  libp2p/protocols/pubsub/pubsub,
   libp2p/protocols/pubsub/gossipsub,
   libp2p/protocols/pubsub/rpc/messages,
   libp2p/stream/connection,
@@ -521,7 +520,7 @@ proc publish*(
   notice "start publish Waku message", msg_hash = msgHash, pubsubTopic = pubsubTopic
 
   try:
-    let relayedPeerCount = await procCall GossipSub(w).publish(pubsubTopic, data)
+    let relayedPeerCount = await procCall GossipSub(w).publishEx(pubsubTopic, data)
 
     if relayedPeerCount > 0:
       for obs in w.publishObservers:
