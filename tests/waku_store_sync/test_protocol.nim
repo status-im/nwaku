@@ -93,6 +93,8 @@ suite "Waku Sync: reconciliation":
     discard server.messageIngress(hash3, msg3, 1)
 
     check:
+      remoteNeeds.len == 0
+      localWants.len == 0
       remoteNeeds.contains((clientPeerInfo.peerId, hash1)) == false
       remoteNeeds.contains((clientPeerInfo.peerId, hash2)) == false
       remoteNeeds.contains((clientPeerInfo.peerId, hash3)) == false
@@ -101,6 +103,8 @@ suite "Waku Sync: reconciliation":
     assert res.isOk(), res.error
 
     check:
+      remoteNeeds.len == 3
+      localWants.len == 0
       remoteNeeds.contains((clientPeerInfo.peerId, hash1)) == true
       remoteNeeds.contains((clientPeerInfo.peerId, hash2)) == true
       remoteNeeds.contains((clientPeerInfo.peerId, hash3)) == true
@@ -122,6 +126,8 @@ suite "Waku Sync: reconciliation":
     discard client.messageIngress(hash3, msg3, 1)
 
     check:
+      remoteNeeds.len == 0
+      localWants.len == 0
       remoteNeeds.contains((serverPeerInfo.peerId, hash1)) == false
       remoteNeeds.contains((serverPeerInfo.peerId, hash2)) == false
       remoteNeeds.contains((serverPeerInfo.peerId, hash3)) == false
@@ -130,6 +136,8 @@ suite "Waku Sync: reconciliation":
     assert res.isOk(), res.error
 
     check:
+      remoteNeeds.len == 3
+      localWants.len == 0
       remoteNeeds.contains((serverPeerInfo.peerId, hash1)) == true
       remoteNeeds.contains((serverPeerInfo.peerId, hash2)) == true
       remoteNeeds.contains((serverPeerInfo.peerId, hash3)) == true
@@ -152,6 +160,8 @@ suite "Waku Sync: reconciliation":
     discard client.messageIngress(hash3, msg3, 1)
 
     check:
+      remoteNeeds.len == 0
+      localWants.len == 0
       remoteNeeds.contains((serverPeerInfo.peerId, hash3)) == false
       remoteNeeds.contains((clientPeerInfo.peerId, hash2)) == false
       localWants.contains((clientPeerInfo.peerId, hash3)) == false
@@ -161,6 +171,8 @@ suite "Waku Sync: reconciliation":
     assert syncRes.isOk(), $syncRes.error
 
     check:
+      remoteNeeds.len == 2
+      localWants.len == 2
       remoteNeeds.contains((serverPeerInfo.peerId, hash3)) == true
       remoteNeeds.contains((clientPeerInfo.peerId, hash2)) == true
       localWants.contains((clientPeerInfo.peerId, hash3)) == true
@@ -267,6 +279,8 @@ suite "Waku Sync: reconciliation":
       timestamp += Timestamp(part)
 
     check:
+      remoteNeeds.len == 0
+      localWants.len == 0
       localWants.contains((serverPeerInfo.peerId, WakuMessageHash(diff))) == false
       remoteNeeds.contains((clientPeerInfo.peerId, WakuMessageHash(diff))) == false
 
@@ -274,6 +288,8 @@ suite "Waku Sync: reconciliation":
     assert res.isOk(), $res.error
 
     check:
+      remoteNeeds.len == 1
+      localWants.len == 1
       localWants.contains((serverPeerInfo.peerId, WakuMessageHash(diff))) == true
       remoteNeeds.contains((clientPeerInfo.peerId, WakuMessageHash(diff))) == true
 

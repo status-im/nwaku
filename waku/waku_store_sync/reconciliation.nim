@@ -123,7 +123,7 @@ proc preProcessPayload(
   let selfLowerBound = timeRange.a
 
   # for non skip ranges check if they happen before any of our ranges
-  # convert to skip range in that case
+  # convert to skip range before processing
   for i in 0 ..< payload.ranges.len:
     let rangeType = payload.ranges[i][1]
     if rangeType != RangeType.Skip:

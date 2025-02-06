@@ -108,8 +108,6 @@ proc computefingerprintFromSlice(
 proc findIdxBounds(self: SeqStorage, slice: Slice[SyncID]): Option[Slice[int]] =
   ## Given bounds find the corresponding indices in this storage
 
-  #TODO can thoses 2 binary search be combined for efficiency ???
-
   let lower = self.elements.lowerBound(slice.a, common.cmp)
   var upper = self.elements.upperBound(slice.b, common.cmp)
 
