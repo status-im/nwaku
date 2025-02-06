@@ -1,7 +1,35 @@
-## v0.35.0 (2025-01-31)
+## v0.35.0 (2025-02-06)
+
+### Notes
+
+- Deprecated parameter
+  - max-relay-peers
+
+- New parameters
+  - relay-service-ratio
+
+    String value with peers distribution within max-connections parameter.
+    This percentage ratio represents the relay peers to service peers.
+    For example, 60:40, tells that 60% of the max-connections will be used for relay protocol
+    and the other 40% of max-connections will be reserved for other service protocols (e.g.,
+    filter, lightpush, store, metadata, etc.)
+
+  - rendezvous
+
+    boolean attribute that optionally activates waku rendezvous discovery server.
+    True by default.
+
+### Release highlights
+
+- New filter approach to keep push stream opened within subscription period.
+- Waku sync protocol.
+- Libwaku async
+- Lite-protocol-tester enhancements.
+- New panels and metrics in RLN to control outstanding request quota.
 
 ### Features
 
+- refactor filter to react when the remote peer closes the stream ([#3281](https://github.com/waku-org/nwaku/issues/3281)) ([5392b8ea4](https://github.com/waku-org/nwaku/commit/5392b8ea4))
 - waku sync shard matching check ([#3259](https://github.com/waku-org/nwaku/issues/3259)) ([42fd6b827](https://github.com/waku-org/nwaku/commit/42fd6b827))
 - waku store sync 2.0 config & setup ([#3217](https://github.com/waku-org/nwaku/issues/3217)) ([7f64dc03a](https://github.com/waku-org/nwaku/commit/7f64dc03a))
 - waku store sync 2.0 protocols & tests ([#3216](https://github.com/waku-org/nwaku/issues/3216)) ([6ee494d90](https://github.com/waku-org/nwaku/commit/6ee494d90))
@@ -31,29 +59,18 @@
 
 - filter remove all subscription from a peer that is leaving ([#3267](https://github.com/waku-org/nwaku/issues/3267)) ([46747fd49](https://github.com/waku-org/nwaku/commit/46747fd49))
 - send msg hash as string on libwaku message event ([#3234](https://github.com/waku-org/nwaku/issues/3234)) ([9c209b4c3](https://github.com/waku-org/nwaku/commit/9c209b4c3))
-- compile with skipParentCfg ([#3262](https://github.com/waku-org/nwaku/issues/3262)) ([aaf3c0070](https://github.com/waku-org/nwaku/commit/aaf3c0070))
-- bump dependencies for v0.35 ([#3255](https://github.com/waku-org/nwaku/issues/3255)) ([f8a233381](https://github.com/waku-org/nwaku/commit/f8a233381))
-- waku_archive add protection against queries longer than 24h ([#3256](https://github.com/waku-org/nwaku/issues/3256)) ([a4d71718a](https://github.com/waku-org/nwaku/commit/a4d71718a))
 - separate heaptrack from debug build ([#3249](https://github.com/waku-org/nwaku/issues/3249)) ([81f24cc25](https://github.com/waku-org/nwaku/commit/81f24cc25))
-- adding debug flag to makefile ([#3248](https://github.com/waku-org/nwaku/issues/3248)) ([dfd06fa72](https://github.com/waku-org/nwaku/commit/dfd06fa72))
 - capping mechanism for relay and service connections ([#3184](https://github.com/waku-org/nwaku/issues/3184)) ([2942782f9](https://github.com/waku-org/nwaku/commit/2942782f9))
-- adding new job in the CI.yml file ([#3193](https://github.com/waku-org/nwaku/issues/3193)) ([6d167dd2e](https://github.com/waku-org/nwaku/commit/6d167dd2e))
 - add extra migration to sqlite and improving error message ([#3240](https://github.com/waku-org/nwaku/issues/3240)) ([bfd60ceab](https://github.com/waku-org/nwaku/commit/bfd60ceab))
 - optimize libwaku size ([#3242](https://github.com/waku-org/nwaku/issues/3242)) ([9c0ad8517](https://github.com/waku-org/nwaku/commit/9c0ad8517))
 - golang example end using negentropy dependency plus simple readme.md ([#3235](https://github.com/waku-org/nwaku/issues/3235)) ([0e0fcfb1a](https://github.com/waku-org/nwaku/commit/0e0fcfb1a))
-- libwaku tweaks ([#3233](https://github.com/waku-org/nwaku/issues/3233)) ([625c8ee51](https://github.com/waku-org/nwaku/commit/625c8ee51))
-- add comment to clarify where contract.nim comes from ([#3226](https://github.com/waku-org/nwaku/issues/3226)) ([b956d0b40](https://github.com/waku-org/nwaku/commit/b956d0b40))
 - enhance libwaku store protocol and more ([#3223](https://github.com/waku-org/nwaku/issues/3223)) ([22ce9ee87](https://github.com/waku-org/nwaku/commit/22ce9ee87))
-- Bump nimbus and nim to latest available - nim-2.0.12 ([#3188](https://github.com/waku-org/nwaku/issues/3188)) ([e2b7149f8](https://github.com/waku-org/nwaku/commit/e2b7149f8))
-- add two metrics and panel ([#3181](https://github.com/waku-org/nwaku/issues/3181)) ([1b532e8ab](https://github.com/waku-org/nwaku/commit/1b532e8ab))
+- add two RLN metrics and panel ([#3181](https://github.com/waku-org/nwaku/issues/3181)) ([1b532e8ab](https://github.com/waku-org/nwaku/commit/1b532e8ab))
 - libwaku async ([#3180](https://github.com/waku-org/nwaku/issues/3180)) ([47a623541](https://github.com/waku-org/nwaku/commit/47a623541))
-- Filter in libwaku ([#3177](https://github.com/waku-org/nwaku/issues/3177)) ([f856298ca](https://github.com/waku-org/nwaku/commit/f856298ca))
+- filter protocol in libwaku ([#3177](https://github.com/waku-org/nwaku/issues/3177)) ([f856298ca](https://github.com/waku-org/nwaku/commit/f856298ca))
 - add supervisor for lite-protocol-tester infra ([#3176](https://github.com/waku-org/nwaku/issues/3176)) ([a7264d68c](https://github.com/waku-org/nwaku/commit/a7264d68c))
-- flaky rln test ([#3173](https://github.com/waku-org/nwaku/issues/3173)) ([bebd3dd62](https://github.com/waku-org/nwaku/commit/bebd3dd62))
-- Partial version bumps for v0.34.0-rc.1 ([#3172](https://github.com/waku-org/nwaku/issues/3172)) ([8368ff006](https://github.com/waku-org/nwaku/commit/8368ff006))
 - libwaku better error handling and better waku thread destroy handling ([#3167](https://github.com/waku-org/nwaku/issues/3167)) ([294dd03c4](https://github.com/waku-org/nwaku/commit/294dd03c4))
 - libwaku allow several multiaddresses for a single peer in store queries ([#3171](https://github.com/waku-org/nwaku/issues/3171)) ([3cb8ebdd8](https://github.com/waku-org/nwaku/commit/3cb8ebdd8))
-- remove protected-topic cli flg ([#3160](https://github.com/waku-org/nwaku/issues/3160)) ([8fde70937](https://github.com/waku-org/nwaku/commit/8fde70937))
 - naming connectPeer procedure ([#3157](https://github.com/waku-org/nwaku/issues/3157)) ([b3656d6ee](https://github.com/waku-org/nwaku/commit/b3656d6ee))
 
 This release supports the following [libp2p protocols](https://docs.libp2p.io/concepts/protocols/):
