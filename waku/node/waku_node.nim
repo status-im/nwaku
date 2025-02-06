@@ -20,7 +20,13 @@ import
   libp2p/builders,
   libp2p/transports/transport,
   libp2p/transports/tcptransport,
-  libp2p/transports/wstransport
+  libp2p/transports/wstransport,
+  ../../vendor/mix/src/mix_node,
+  ../../vendor/mix/src/mix_protocol,
+  ../../vendor/mix/src/curve25519,
+  ../../vendor/mix/src/protocol
+
+
 import
   ../waku_core,
   ../waku_core/topics/sharding,
@@ -119,6 +125,7 @@ type
     topicSubscriptionQueue*: AsyncEventQueue[SubscriptionEvent]
     contentTopicHandlers: Table[ContentTopic, TopicHandler]
     rateLimitSettings*: ProtocolRateLimitSettings
+    mix*: MixProtocol
 
 proc new*(
     T: type WakuNode,
@@ -202,6 +209,49 @@ proc mountSharding*(
 ): Result[void, string] =
   info "mounting sharding", clusterId = clusterId, shardCount = shardCount
   node.wakuSharding = Sharding(clusterId: clusterId, shardCountGenZero: shardCount)
+  return ok()
+
+ # Mix Protocol
+proc mountMix*(node: WakuNode): Result[void, string] =
+  info "mounting mix protocol" #TODO log the config used
+
+  var mixNodes = initTable[PeerId, MixPubInfo]()
+  # TODO: pass bootstrap node info here as mixNodes
+
+  let keyPairResult = generateKeyPair()
+  if keyPairResult.isErr:
+    return err("Generate key pair error: " & $keyPairResult.error)
+  let (mixPrivKey, mixPubKey) = keyPairResult.get()
+
+  let localaddrStr = node.announcedAddresses[0].toString().valueOr:
+    return err("Failed to convert multiaddress to string.")
+
+  let localMixNodeInfo = initMixNodeInfo(
+    localaddrStr, mixPubKey, mixPrivKey, node.switch.peerInfo.publicKey.skkey,
+    node.switch.peerInfo.privateKey.skkey,
+  )
+
+  let protoRes = MixProtocol.initMix(localMixNodeInfo, node.switch, mixNodes)
+  if protoRes.isErr:
+    error "Mix protocol initialization failed", err = protoRes.error
+    return
+  node.mix = protoRes.value
+
+  var sendHandlerFunc = proc(
+      conn: Connection, proto: ProtocolType
+  ): Future[void] {.async.} =
+    try:
+      await callHandler(node.switch, conn, proto) # Call handler on the switch
+    except CatchableError as e:
+      error "Error during execution of MixProtocol handler: ", err = e.msg
+    return
+  node.mix.setCallback(sendHandlerFunc)
+
+  let catchRes = catch:
+    node.switch.mount(node.mix)
+  if catchRes.isErr():
+    return err(catchRes.error.msg)
+
   return ok()
 
 ## Waku Sync
