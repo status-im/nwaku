@@ -491,8 +491,7 @@ procSuite "Waku Archive - find messages":
       response.messages.mapIt(it.timestamp) == @[ts(30, timeOrigin), ts(50, timeOrigin)]
 
   test "handle temporal history query with a zero-size time window":
-    ## A zero-size window results in an error to the store client. That kind of queries
-    ## are pointless and we need to rapidly inform about that to the client.
+    ## A zero-size window results in an empty list of history messages
     ## Given
     let req = ArchiveQuery(
       contentTopics: @[ContentTopic("1")],
@@ -504,45 +503,27 @@ procSuite "Waku Archive - find messages":
     let res = waitFor archiveA.findMessages(req)
 
     ## Then
-    check not res.isOk()
+    check res.isOk()
+
+    let response = res.tryGet()
+    check:
+      response.messages.len == 0
 
   test "handle temporal history query with an invalid time window":
-    ## A query with an invalid time range should immediately return a query error to the client
+    ## A history query with an invalid time range results in an empty list of history messages
     ## Given
     let req = ArchiveQuery(
       contentTopics: @[ContentTopic("1")],
       startTime: some(Timestamp(5)),
-      endTime: some(Timestamp(4)),
+      endTime: some(Timestamp(2)),
     )
 
     ## When
     let res = waitFor archiveA.findMessages(req)
 
     ## Then
-    check not res.isOk()
-
-  test "time range should be smaller than 24h":
-    let oneDayRangeNanos = 86_400_000_000_000
-    let now = getNowInNanosecondTime()
-
-    var res = waitFor archiveA.findMessages(
-      ArchiveQuery(
-        contentTopics: @[ContentTopic("1")],
-        startTime: some(Timestamp(now - oneDayRangeNanos - 1)),
-        endTime: some(Timestamp(now)),
-      )
-    )
-
-    ## It fails if range is a bit bigger than 24h
-    check not res.isOk()
-
-    res = waitFor archiveA.findMessages(
-      ArchiveQuery(
-        contentTopics: @[ContentTopic("1")],
-        startTime: some(Timestamp(now - oneDayRangeNanos)),
-        endTime: some(Timestamp(now)),
-      )
-    )
-
-    ## Ok if range is 24h
     check res.isOk()
+
+    let response = res.tryGet()
+    check:
+      response.messages.len == 0

@@ -47,16 +47,16 @@ suite "Waku Store - End to End - Sorted Archive":
     let timeOrigin = now()
     let messages =
       @[
-        fakeWakuMessage(@[byte 00], ts = ts(-90, timeOrigin)),
-        fakeWakuMessage(@[byte 01], ts = ts(-80, timeOrigin)),
-        fakeWakuMessage(@[byte 02], ts = ts(-70, timeOrigin)),
-        fakeWakuMessage(@[byte 03], ts = ts(-60, timeOrigin)),
-        fakeWakuMessage(@[byte 04], ts = ts(-50, timeOrigin)),
-        fakeWakuMessage(@[byte 05], ts = ts(-40, timeOrigin)),
-        fakeWakuMessage(@[byte 06], ts = ts(-30, timeOrigin)),
-        fakeWakuMessage(@[byte 07], ts = ts(-20, timeOrigin)),
-        fakeWakuMessage(@[byte 08], ts = ts(-10, timeOrigin)),
-        fakeWakuMessage(@[byte 09], ts = ts(00, timeOrigin)),
+        fakeWakuMessage(@[byte 00], ts = ts(00, timeOrigin)),
+        fakeWakuMessage(@[byte 01], ts = ts(10, timeOrigin)),
+        fakeWakuMessage(@[byte 02], ts = ts(20, timeOrigin)),
+        fakeWakuMessage(@[byte 03], ts = ts(30, timeOrigin)),
+        fakeWakuMessage(@[byte 04], ts = ts(40, timeOrigin)),
+        fakeWakuMessage(@[byte 05], ts = ts(50, timeOrigin)),
+        fakeWakuMessage(@[byte 06], ts = ts(60, timeOrigin)),
+        fakeWakuMessage(@[byte 07], ts = ts(70, timeOrigin)),
+        fakeWakuMessage(@[byte 08], ts = ts(80, timeOrigin)),
+        fakeWakuMessage(@[byte 09], ts = ts(90, timeOrigin)),
       ]
     archiveMessages = messages.mapIt(
       WakuMessageKeyValue(
@@ -909,17 +909,17 @@ suite "Waku Store - End to End - Archive with Multiple Topics":
 
     let messages =
       @[
-        fakeWakuMessage(@[byte 00], ts = originTs(-90), contentTopic = contentTopic),
-        fakeWakuMessage(@[byte 01], ts = originTs(-80), contentTopic = contentTopicB),
-        fakeWakuMessage(@[byte 02], ts = originTs(-70), contentTopic = contentTopicC),
-        fakeWakuMessage(@[byte 03], ts = originTs(-60), contentTopic = contentTopic),
-        fakeWakuMessage(@[byte 04], ts = originTs(-50), contentTopic = contentTopicB),
-        fakeWakuMessage(@[byte 05], ts = originTs(-40), contentTopic = contentTopicC),
-        fakeWakuMessage(@[byte 06], ts = originTs(-30), contentTopic = contentTopic),
-        fakeWakuMessage(@[byte 07], ts = originTs(-20), contentTopic = contentTopicB),
-        fakeWakuMessage(@[byte 08], ts = originTs(-10), contentTopic = contentTopicC),
+        fakeWakuMessage(@[byte 00], ts = originTs(00), contentTopic = contentTopic),
+        fakeWakuMessage(@[byte 01], ts = originTs(10), contentTopic = contentTopicB),
+        fakeWakuMessage(@[byte 02], ts = originTs(20), contentTopic = contentTopicC),
+        fakeWakuMessage(@[byte 03], ts = originTs(30), contentTopic = contentTopic),
+        fakeWakuMessage(@[byte 04], ts = originTs(40), contentTopic = contentTopicB),
+        fakeWakuMessage(@[byte 05], ts = originTs(50), contentTopic = contentTopicC),
+        fakeWakuMessage(@[byte 06], ts = originTs(60), contentTopic = contentTopic),
+        fakeWakuMessage(@[byte 07], ts = originTs(70), contentTopic = contentTopicB),
+        fakeWakuMessage(@[byte 08], ts = originTs(80), contentTopic = contentTopicC),
         fakeWakuMessage(
-          @[byte 09], ts = originTs(00), contentTopic = contentTopicSpecials
+          @[byte 09], ts = originTs(90), contentTopic = contentTopicSpecials
         ),
       ]
 
@@ -1089,9 +1089,21 @@ suite "Waku Store - End to End - Archive with Multiple Topics":
   suite "Validation of Time-based Filtering":
     asyncTest "Basic Time Filtering":
       # Given a history query with start and end time
-      storeQuery.startTime = some(originTs(-90))
-      storeQuery.endTime = some(originTs(-60))
-      storeQuery.contentTopics = @[contentTopic, contentTopicB, contentTopicC]
+      storeQuery.startTime = some(originTs(20))
+      storeQuery.endTime = some(originTs(40))
+
+      # When making a history query
+      let queryResponse = await client.query(storeQuery, serverRemotePeerInfo)
+
+      # Then the response contains the messages
+      check:
+        queryResponse.get().messages ==
+          @[archiveMessages[2], archiveMessages[3], archiveMessages[4]]
+
+    asyncTest "Only Start Time Specified":
+      # Given a history query with only start time
+      storeQuery.startTime = some(originTs(20))
+      storeQuery.endTime = none(Timestamp)
 
       # When making a history query
       let queryResponse = await client.query(storeQuery, serverRemotePeerInfo)
@@ -1100,35 +1112,30 @@ suite "Waku Store - End to End - Archive with Multiple Topics":
       check:
         queryResponse.get().messages ==
           @[
-            archiveMessages[0],
-            archiveMessages[1],
             archiveMessages[2],
             archiveMessages[3],
+            archiveMessages[4],
+            archiveMessages[5],
           ]
-
-    asyncTest "Only Start Time Specified":
-      # Given a history query with only start time
-      storeQuery.startTime = some(originTs(-40))
-      storeQuery.endTime = none(Timestamp)
-
-      # When making a history query
-      let queryResponse = await client.query(storeQuery, serverRemotePeerInfo)
-
-      # Then the response contains the messages
-      check:
-        queryResponse.get().messages == @[archiveMessages[5]]
 
     asyncTest "Only End Time Specified":
       # Given a history query with only end time
       storeQuery.startTime = none(Timestamp)
-      storeQuery.endTime = some(originTs(-80))
+      storeQuery.endTime = some(originTs(40))
 
       # When making a history query
       let queryResponse = await client.query(storeQuery, serverRemotePeerInfo)
 
       # Then the response contains no messages
       check:
-        queryResponse.get().messages == @[archiveMessages[0], archiveMessages[1]]
+        queryResponse.get().messages ==
+          @[
+            archiveMessages[0],
+            archiveMessages[1],
+            archiveMessages[2],
+            archiveMessages[3],
+            archiveMessages[4],
+          ]
 
     asyncTest "Invalid Time Range":
       # Given a history query with invalid time range
@@ -1144,8 +1151,8 @@ suite "Waku Store - End to End - Archive with Multiple Topics":
 
     asyncTest "Time Filtering with Content Filtering":
       # Given a history query with time and content filtering
-      storeQuery.startTime = some(originTs(-60))
-      storeQuery.endTime = some(originTs(-20))
+      storeQuery.startTime = some(originTs(20))
+      storeQuery.endTime = some(originTs(60))
       storeQuery.contentTopics = @[contentTopicC]
 
       # When making a history query
@@ -1153,7 +1160,7 @@ suite "Waku Store - End to End - Archive with Multiple Topics":
 
       # Then the response contains the messages
       check:
-        queryResponse.get().messages == @[archiveMessages[5]]
+        queryResponse.get().messages == @[archiveMessages[2], archiveMessages[5]]
 
     asyncTest "Messages Outside of Time Range":
       # Given a history query with a valid time range which does not contain any messages
