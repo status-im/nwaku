@@ -13,7 +13,8 @@ type EligibilityManager* = ref object # FIXME: make web3 private?
 proc init*(
     T: type EligibilityManager, ethClient: string
 ): Future[EligibilityManager] {.async.} =
-  return EligibilityManager(web3: await newWeb3(ethClient), seenTxIds: initHashSet[TxHash]())
+  return
+    EligibilityManager(web3: await newWeb3(ethClient), seenTxIds: initHashSet[TxHash]())
   # TODO: handle error if web3 instance is not established
 
 # Clean up the web3 instance

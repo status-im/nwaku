@@ -518,6 +518,42 @@ proc connectedPeers*(
 
   return (inPeers, outPeers)
 
+proc getStreamByPeerIdAndProtocol*(
+    pm: PeerManager, peerId: PeerId, protocol: string
+): Future[Result[Connection, string]] {.async.} =
+  ## Establishes a new stream to the given peer and protocol or returns the existing stream, if any.
+  ## Notice that the "Connection" type represents a stream within a transport connection
+  ## (we will need to adapt this term.)
+
+  let peerIdsMuxers: Table[PeerId, seq[Muxer]] = pm.switch.connManager.getConnections()
+  if not peerIdsMuxers.contains(peerId):
+    return err("peerId not found in connManager: " & $peerId)
+
+  let muxers = peerIdsMuxers[peerId]
+
+  var streams = newSeq[Connection](0)
+  for m in muxers:
+    for s in m.getStreams():
+      ## getStreams is defined in nim-libp2p
+      streams.add(s)
+
+  ## Try to get the opened streams for the given protocol
+  let streamsOfInterest = streams.filterIt(
+    it.protocol == protocol and not LPStream(it).isClosed and
+      not LPStream(it).isClosedRemotely
+  )
+
+  if streamsOfInterest.len > 0:
+    ## In theory there should be one stream per protocol. Then we just pick up the 1st
+    return ok(streamsOfInterest[0])
+
+  ## There isn't still a stream. Let's dial to create one
+  let streamRes = await pm.dialPeer(peerId, protocol)
+  if streamRes.isNone():
+    return err("getStreamByPeerIdProto no connection to peer: " & $peerId)
+
+  return ok(streamRes.get())
+
 proc connectToRelayPeers*(pm: PeerManager) {.async.} =
   var (inRelayPeers, outRelayPeers) = pm.connectedPeers(WakuRelayCodec)
   let totalRelayPeers = inRelayPeers.len + outRelayPeers.len

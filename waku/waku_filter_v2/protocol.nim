@@ -172,29 +172,15 @@ proc pushToPeer(
 ): Future[Result[void, string]] {.async.} =
   debug "pushing message to subscribed peer", peerId = shortLog(peerId)
 
-  if not wf.peerManager.wakuPeerStore.hasPeer(peerId, WakuFilterPushCodec):
-    # Check that peer has not been removed from peer store
-    error "no addresses for peer", peerId = shortLog(peerId)
-    return err("no addresses for peer: " & $peerId)
+  let stream = (
+    await wf.peerManager.getStreamByPeerIdAndProtocol(peerId, WakuFilterPushCodec)
+  ).valueOr:
+    error "pushToPeer failed", error
+    return err("pushToPeer failed: " & $error)
 
-  let conn =
-    if wf.peerConnections.contains(peerId):
-      wf.peerConnections[peerId]
-    else:
-      ## we never pushed a message before, let's dial then
-      let connRes = await wf.peerManager.dialPeer(peerId, WakuFilterPushCodec)
-      if connRes.isNone():
-        ## We do not remove this peer, but allow the underlying peer manager
-        ## to do so if it is deemed necessary
-        error "pushToPeer no connection to peer", peerId = shortLog(peerId)
-        return err("pushToPeer no connection to peer: " & shortLog(peerId))
+  await stream.writeLp(buffer)
 
-      let newConn = connRes.get()
-      wf.peerConnections[peerId] = newConn
-      newConn
-
-  await conn.writeLp(buffer)
-  debug "published successful", peerId = shortLog(peerId), conn
+  debug "published successful", peerId = shortLog(peerId), stream
   waku_service_network_bytes.inc(
     amount = buffer.len().int64, labelValues = [WakuFilterPushCodec, "out"]
   )
