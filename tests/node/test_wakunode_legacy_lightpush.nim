@@ -18,17 +18,17 @@ import
     waku_filter_v2,
     waku_filter_v2/client,
     waku_filter_v2/subscriptions,
-    waku_lightpush,
-    waku_lightpush/common,
-    waku_lightpush/client,
-    waku_lightpush/protocol_metrics,
-    waku_lightpush/rpc,
+    waku_lightpush_legacy,
+    waku_lightpush_legacy/common,
+    waku_lightpush_legacy/client,
+    waku_lightpush_legacy/protocol_metrics,
+    waku_lightpush_legacy/rpc,
     waku_rln_relay,
   ],
   ../testlib/[assertions, common, wakucore, wakunode, testasync, futures, testutils],
   ../resources/payloads
 
-suite "Waku Lightpush - End To End":
+suite "Waku Legacy Lightpush - End To End":
   var
     handlerFuture {.threadvar.}: Future[(PubsubTopic, WakuMessage)]
     handler {.threadvar.}: PushMessageHandler
@@ -60,8 +60,8 @@ suite "Waku Lightpush - End To End":
     await server.start()
 
     await server.mountRelay()
-    await server.mountLightpush() # without rln-relay
-    client.mountLightpushClient()
+    await server.mountLegacyLightpush() # without rln-relay
+    client.mountLegacyLightpushClient()
 
     serverRemotePeerInfo = server.peerInfo.toRemotePeerInfo()
     pubsubTopic = DefaultPubsubTopic
@@ -79,7 +79,7 @@ suite "Waku Lightpush - End To End":
       lightpushClient.mountLightpushClient()
 
       # When the client publishes a message
-      let publishResponse = await lightpushClient.lightpushPublish(
+      let publishResponse = await lightpushClient.legacyLightpushPublish(
         some(pubsubTopic), message, serverRemotePeerInfo
       )
 
@@ -100,7 +100,7 @@ suite "Waku Lightpush - End To End":
       )
 
       # When the client publishes an over-limit message
-      let publishResponse = await client.lightpushPublish(
+      let publishResponse = await client.legacyLightpushPublish(
         some(pubsubTopic), msgOverLimit, serverRemotePeerInfo
       )
 
@@ -170,7 +170,7 @@ suite "RLN Proofs as a Lightpush Service":
       lightpushClient.mountLightpushClient()
 
       # When the client publishes a message
-      let publishResponse = await lightpushClient.lightpushPublish(
+      let publishResponse = await lightpushClient.legacyLightpushPublish(
         some(pubsubTopic), message, serverRemotePeerInfo
       )
 

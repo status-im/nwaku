@@ -12,7 +12,7 @@ import
   ../../../waku_store_legacy/common,
   ../../../waku_store/common,
   ../../../waku_filter_v2,
-  ../../../waku_lightpush/common,
+  ../../../waku_lightpush_legacy/common,
   ../../../waku_relay,
   ../../../waku_peer_exchange,
   ../../../waku_node,
@@ -84,6 +84,18 @@ proc installAdminV1GetPeersHandler(router: var RestRouter, node: WakuNode) =
         )
       )
     tuplesToWakuPeers(peers, legacyStorePeers)
+
+    let legacyLightpushPeers = node.peerManager.wakuPeerStore
+      .peers(WakuLegacyLightPushCodec)
+      .mapIt(
+        (
+          multiaddr: constructMultiaddrStr(it),
+          protocol: WakuLegacyLightPushCodec,
+          connected: it.connectedness == Connectedness.Connected,
+          origin: it.origin,
+        )
+      )
+    tuplesToWakuPeers(peers, legacyLightpushPeers)
 
     let lightpushPeers = node.peerManager.wakuPeerStore.peers(WakuLightPushCodec).mapIt(
         (

@@ -275,7 +275,7 @@ proc new*(
       return err("A storenode should be set when reliability mode is on")
 
     let deliveryMonitorRes = DeliveryMonitor.new(
-      node.wakuStoreClient, node.wakuRelay, node.wakuLightpushClient,
+      node.wakuStoreClient, node.wakuRelay, node.wakuLegacyLightpushClient,
       node.wakuFilterClient,
     )
     if deliveryMonitorRes.isErr():

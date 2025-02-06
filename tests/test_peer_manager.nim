@@ -770,7 +770,7 @@ procSuite "Peer Manager":
 
     # service peers
     node.peerManager.addServicePeer(peers[0], WakuStoreCodec)
-    node.peerManager.addServicePeer(peers[1], WakuLightPushCodec)
+    node.peerManager.addServicePeer(peers[1], WakuLegacyLightPushCodec)
     node.peerManager.addServicePeer(peers[2], WakuPeerExchangeCodec)
 
     # relay peers (should not be added)
@@ -788,7 +788,7 @@ procSuite "Peer Manager":
     # all service peers are added to its service slot
     check:
       node.peerManager.serviceSlots[WakuStoreCodec].peerId == peers[0].peerId
-      node.peerManager.serviceSlots[WakuLightPushCodec].peerId == peers[1].peerId
+      node.peerManager.serviceSlots[WakuLegacyLightPushCodec].peerId == peers[1].peerId
       node.peerManager.serviceSlots[WakuPeerExchangeCodec].peerId == peers[2].peerId
 
       # but the relay peer is not
@@ -917,13 +917,13 @@ procSuite "Peer Manager":
       selectedPeer2.get().peerId == peers[0].peerId
 
     # And return none if we dont have any peer for that protocol
-    let selectedPeer3 = pm.selectPeer(WakuLightPushCodec)
+    let selectedPeer3 = pm.selectPeer(WakuLegacyLightPushCodec)
     check:
       selectedPeer3.isSome() == false
 
     # Now we add service peers for different protocols peer[1..3]
     pm.addServicePeer(peers[1], WakuStoreCodec)
-    pm.addServicePeer(peers[2], WakuLightPushCodec)
+    pm.addServicePeer(peers[2], WakuLegacyLightPushCodec)
 
     # We no longer get one from the peerstore. Slots are being used instead.
     let selectedPeer4 = pm.selectPeer(WakuStoreCodec)
@@ -931,7 +931,7 @@ procSuite "Peer Manager":
       selectedPeer4.isSome() == true
       selectedPeer4.get().peerId == peers[1].peerId
 
-    let selectedPeer5 = pm.selectPeer(WakuLightPushCodec)
+    let selectedPeer5 = pm.selectPeer(WakuLegacyLightPushCodec)
     check:
       selectedPeer5.isSome() == true
       selectedPeer5.get().peerId == peers[2].peerId

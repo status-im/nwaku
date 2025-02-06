@@ -286,7 +286,7 @@ suite "Sharding":
 
       asyncTest "lightpush":
         # Given a connected server and client subscribed to the same pubsub topic
-        client.mountLightPushClient()
+        client.mountLegacyLightPushClient()
         await server.mountLightpush()
 
         let
@@ -299,7 +299,7 @@ suite "Sharding":
         let
           msg =
             WakuMessage(payload: "message".toBytes(), contentTopic: "myContentTopic")
-          lightpublishRespnse = await client.lightpushPublish(
+          lightpublishRespnse = await client.legacyLightpushPublish(
             some(topic), msg, server.switch.peerInfo.toRemotePeerInfo()
           )
 
@@ -409,7 +409,7 @@ suite "Sharding":
 
       asyncTest "lightpush (automatic sharding filtering)":
         # Given a connected server and client using the same content topic (with two different formats)
-        client.mountLightPushClient()
+        client.mountLegacyLightPushClient()
         await server.mountLightpush()
 
         let
@@ -424,7 +424,7 @@ suite "Sharding":
         let
           msg =
             WakuMessage(payload: "message".toBytes(), contentTopic: contentTopicFull)
-          lightpublishRespnse = await client.lightpushPublish(
+          lightpublishRespnse = await client.legacyLightpushPublish(
             some(pubsubTopic), msg, server.switch.peerInfo.toRemotePeerInfo()
           )
 
@@ -567,7 +567,7 @@ suite "Sharding":
 
       asyncTest "lightpush - exclusion (automatic sharding filtering)":
         # Given a connected server and client using different content topics
-        client.mountLightPushClient()
+        client.mountLegacyLightPushClient()
         await server.mountLightpush()
 
         let
@@ -584,7 +584,7 @@ suite "Sharding":
         # When a peer publishes a message in the server's subscribed topic (the client, for testing easeness)
         let
           msg = WakuMessage(payload: "message".toBytes(), contentTopic: contentTopic2)
-          lightpublishRespnse = await client.lightpushPublish(
+          lightpublishRespnse = await client.legacyLightpushPublish(
             some(pubsubTopic2), msg, server.switch.peerInfo.toRemotePeerInfo()
           )
 
@@ -854,12 +854,12 @@ suite "Sharding":
         (await clientHandler3.waitForResult(FUTURE_TIMEOUT)).isErr()
 
     asyncTest "Protocol with Unconfigured PubSub Topic Fails":
-      # Given a 
+      # Given a
       let
         contentTopic = "myContentTopic"
         topic = "/waku/2/rs/0/1"
         # Using a different topic to simulate "unconfigured" pubsub topic
-        # but to have a handler (and be able to assert the test) 
+        # but to have a handler (and be able to assert the test)
         serverHandler = server.subscribeCompletionHandler("/waku/2/rs/0/0")
         clientHandler = client.subscribeCompletionHandler("/waku/2/rs/0/0")
 
@@ -878,7 +878,7 @@ suite "Sharding":
 
     asyncTest "Waku LightPush Sharding (Static Sharding)":
       # Given a connected server and client using two different pubsub topics
-      client.mountLightPushClient()
+      client.mountLegacyLightPushClient()
       await server.mountLightpush()
 
       # Given a connected server and client subscribed to multiple pubsub topics
@@ -898,7 +898,7 @@ suite "Sharding":
       # When a peer publishes a message (the client, for testing easeness) in topic1
       let
         msg1 = WakuMessage(payload: "message1".toBytes(), contentTopic: contentTopic)
-        lightpublishRespnse = await client.lightpushPublish(
+        lightpublishRespnse = await client.legacyLightpushPublish(
           some(topic1), msg1, server.switch.peerInfo.toRemotePeerInfo()
         )
 
@@ -916,7 +916,7 @@ suite "Sharding":
       clientHandler2.reset()
       let
         msg2 = WakuMessage(payload: "message2".toBytes(), contentTopic: contentTopic)
-        lightpublishResponse2 = await client.lightpushPublish(
+        lightpublishResponse2 = await client.legacyLightpushPublish(
           some(topic2), msg2, server.switch.peerInfo.toRemotePeerInfo()
         )
 

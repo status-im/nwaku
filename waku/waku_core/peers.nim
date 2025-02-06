@@ -257,7 +257,7 @@ proc parseUrlPeerAddr*(
 
 proc toRemotePeerInfo*(enr: enr.Record): Result[RemotePeerInfo, cstring] =
   ## Converts an ENR to dialable RemotePeerInfo
-  let typedR = ?enr.toTypedRecord()
+  let typedR = TypedRecord.fromRecord(enr)
   if not typedR.secp256k1.isSome():
     return err("enr: no secp256k1 key in record")
 
@@ -351,12 +351,8 @@ func hasUdpPort*(peer: RemotePeerInfo): bool =
 
   let
     enr = peer.enr.get()
-    typedEnrRes = enr.toTypedRecord()
+    typedEnr = TypedRecord.fromRecord(enr)
 
-  if typedEnrRes.isErr():
-    return false
-
-  let typedEnr = typedEnrRes.get()
   typedEnr.udp.isSome() or typedEnr.udp6.isSome()
 
 proc getAgent*(peer: RemotePeerInfo): string =

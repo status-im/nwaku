@@ -113,14 +113,14 @@ proc process*(
     let msg = self.message.toWakuMessage()
     let pubsubTopic = $self.pubsubTopic
 
-    let numPeers = await waku.node.wakuRelay.publish(pubsubTopic, msg)
-    if numPeers == 0:
-      let errorMsg = "Message not sent because no peers found."
-      error "PUBLISH failed", error = errorMsg
+    let publishRes = await waku.node.wakuRelay.publish(pubsubTopic, msg)
+    if publishRes.isErr():
+      let errorMsg = "Message not sent."
+      error "PUBLISH failed", error = errorMsg, reason = publishRes.error.msg
       return err(errorMsg)
-    elif numPeers > 0:
-      let msgHash = computeMessageHash(pubSubTopic, msg).to0xHex
-      return ok(msgHash)
+    let numPeers = publishRes.get()
+    let msgHash = computeMessageHash(pubSubTopic, msg).to0xHex
+    return ok(msgHash)
   of LIST_CONNECTED_PEERS:
     let numConnPeers = waku.node.wakuRelay.getNumConnectedPeers($self.pubsubTopic).valueOr:
       error "LIST_CONNECTED_PEERS failed", error = error

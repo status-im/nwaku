@@ -2,7 +2,7 @@
 ## use lightpush to publish messages without relay
 
 import chronicles, chronos, stew/byteutils, results
-import waku/[common/logging, node/peer_manager, waku_core, waku_lightpush/client]
+import waku/[common/logging, node/peer_manager, waku_core, waku_lightpush_legacy/client]
 
 const
   LightpushPeer =
@@ -12,7 +12,7 @@ const
   LightpushContentTopic = ContentTopic("/examples/1/light-pubsub-example/proto")
 
 proc publishMessages(
-    wlc: WakuLightpushClient,
+    wlc: WakuLegacyLightpushClient,
     lightpushPeer: RemotePeerInfo,
     lightpushPubsubTopic: PubsubTopic,
     lightpushContentTopic: ContentTopic,
@@ -44,7 +44,7 @@ proc setupAndPublish(rng: ref HmacDrbgContext) =
   var
     switch = newStandardSwitch()
     pm = PeerManager.new(switch)
-    wlc = WakuLightpushClient.new(pm, rng)
+    wlc = WakuLegacyLightpushClient.new(pm, rng)
 
   # Start maintaining subscription
   asyncSpawn publishMessages(

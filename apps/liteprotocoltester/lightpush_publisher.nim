@@ -145,7 +145,7 @@ proc publishMessages(
       lightpushContentTopic,
       renderMsgSize,
     )
-    let wlpRes = await wakuNode.lightpushPublish(
+    let wlpRes = await wakuNode.legacyLightpushPublish(
       some(lightpushPubsubTopic), message, actualServicePeer
     )
 
@@ -209,7 +209,7 @@ proc setupAndPublish*(
   if isNil(wakuNode.wakuLightpushClient):
     # if we have not yet initialized lightpush client, then do it as the only way we can get here is
     # by having a service peer discovered.
-    wakuNode.mountLightPushClient()
+    wakuNode.mountLegacyLightPushClient()
 
   # give some time to receiver side to set up
   let waitTillStartTesting = conf.startPublishingAfter.seconds

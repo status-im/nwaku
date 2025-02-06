@@ -2,12 +2,12 @@
 
 import std/options, stew/shims/net as stewNet, testutils/unittests, chronos
 import
-  waku/[waku_core, waku_lightpush/common, node/peer_manager, waku_node],
+  waku/[waku_core, waku_lightpush_legacy/common, node/peer_manager, waku_node],
   ./testlib/wakucore,
   ./testlib/wakunode
 
-suite "WakuNode - Lightpush":
-  asyncTest "Lightpush message return success":
+suite "WakuNode - Legacy Lightpush":
+  asyncTest "Legacy lightpush message return success":
     ## Setup
     let
       lightNodeKey = generateSecp256k1Key()
@@ -21,11 +21,11 @@ suite "WakuNode - Lightpush":
 
     await destNode.mountRelay(@[DefaultRelayShard])
     await bridgeNode.mountRelay(@[DefaultRelayShard])
-    await bridgeNode.mountLightPush()
-    lightNode.mountLightPushClient()
+    await bridgeNode.mountLegacyLightPush()
+    lightNode.mountLegacyLightPushClient()
 
     discard await lightNode.peerManager.dialPeer(
-      bridgeNode.peerInfo.toRemotePeerInfo(), WakuLightPushCodec
+      bridgeNode.peerInfo.toRemotePeerInfo(), WakuLegacyLightPushCodec
     )
     await sleepAsync(100.milliseconds)
     await destNode.connectToNodes(@[bridgeNode.peerInfo.toRemotePeerInfo()])
@@ -48,7 +48,7 @@ suite "WakuNode - Lightpush":
     await sleepAsync(100.millis)
 
     ## When
-    let res = await lightNode.lightpushPublish(some(DefaultPubsubTopic), message)
+    let res = await lightNode.legacyLightpushPublish(some(DefaultPubsubTopic), message)
     assert res.isOk(), $res.error
 
     ## Then
