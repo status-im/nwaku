@@ -163,40 +163,10 @@ proc syncMessageIngress*(
 
   return ok()
 
-proc validateTimeRange(
-    startTime: Option[Timestamp], endTime: Option[Timestamp]
-): Result[void, ArchiveError] =
-  ## Returns ok if the given time range is shorter than one day, and error otherwise.
-  ## We restrict the maximum allowed time of 24h to prevent excessive big queries.
-
-  let oneDayRangeNanos = 86_400_000_000_000
-  let now = getNowInNanosecondTime()
-
-  var startTimeToValidate = now - oneDayRangeNanos
-  if startTime.isSome():
-    startTimeToValidate = startTime.get()
-
-  var endTimeToValidate = now
-  if endTime.isSome():
-    endTimeToValidate = endTime.get()
-
-  if startTimeToValidate >= endTimeToValidate:
-    return err(ArchiveError.invalidQuery("startTime should be before endTime"))
-
-  if (endTimeToValidate - startTimeToValidate) > oneDayRangeNanos:
-    return err(
-      ArchiveError.invalidQuery("time range should be smaller than one day in nanos")
-    )
-
-  return ok()
-
 proc findMessages*(
     self: WakuArchive, query: ArchiveQuery
 ): Future[ArchiveResult] {.async, gcsafe.} =
   ## Search the archive to return a single page of messages matching the query criteria
-
-  validateTimeRange(query.startTime, query.endTime).isOkOr:
-    return err(error)
 
   if query.cursor.isSome():
     let cursor = query.cursor.get()
