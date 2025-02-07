@@ -21,7 +21,7 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       name: Checkout code
       id: checkout
     - uses: dorny/paths-filter@v2
@@ -61,7 +61,7 @@ jobs:
     name: build-${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get submodules hash
         id: submodules
@@ -92,7 +92,7 @@ jobs:
     name: test-${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get submodules hash
         id: submodules
@@ -158,7 +158,7 @@ jobs:
     needs: build
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get submodules hash
         id: submodules

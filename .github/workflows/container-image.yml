@@ -44,7 +44,7 @@ jobs:
       
       - name: Checkout code
         if: ${{ steps.secrets.outcome == 'success' }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get submodules hash
         id: submodules
