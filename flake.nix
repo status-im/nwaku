@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     zerokit = {
-      url = "github:vacp2p/zerokit?ref=add-nix-flake-and-derivation";
+      url = "github:vacp2p/zerokit?rev=4479810968b88d0ef92717524adf5edd23df1869";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -14,7 +14,9 @@
       stableSystems = [
         "x86_64-linux" "aarch64-linux"
       ];
+
       forAllSystems = f: nixpkgs.lib.genAttrs stableSystems (system: f system);
+
       pkgsFor = forAllSystems (
         system: import nixpkgs {
           inherit system;
@@ -31,20 +33,18 @@
           ];
         }
       );
+
     in rec {
       packages = forAllSystems (system: let
-        zerokitPkg = zerokit.packages.${system}.default;
-        buildTarget = pkgsFor.${system}.callPackage ./nix/default.nix rec {
-          inherit stableSystems zerokitPkg;
+        buildTarget = targets: pkgsFor.${system}.callPackage ./nix/default.nix {
+          inherit stableSystems;
           src = self;
+          zerokitPkg = zerokit.packages.x86_64-linux.default;
+          androidArch = "aarch64-linux-android";
         };
-        build = targets: buildTarget.override { inherit targets; };
       in rec {
-        libwaku-android-amd64 = build ["libwaku-android-amd64"];
-        libwaku-android-arm64 = build ["libwaku-android-arm64"];
-        libwaku-android-arm   = build ["libwaku-android-arm"];
-        libwaku-android-x86   = build ["libwaku-android-x86"];
-        default = libwaku-android-amd64;
+        libwaku-android-arm64 = buildTarget "libwaku-android-arm64";
+        default = libwaku-android-arm64;
       });
 
       devShells = forAllSystems (system: {

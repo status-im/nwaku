@@ -8,9 +8,8 @@
   stableSystems ? [
     "x86_64-linux" "aarch64-linux"
   ],
-  zerokitPkg ? (
-    builtins.getFlake "github:vacp2p/zerokit?ref=add-nix-flake-and-derivation"
-  ).packages.${builtins.currentSystem}.default
+  androidArch,
+  zerokitPkg,
 }:
 
 assert pkgs.lib.assertMsg ((src.submodules or true) == true)
@@ -87,6 +86,8 @@ in stdenv.mkDerivation rec {
     cp -r ${callPackage ./csources.nix {}}  csources_v2
     chmod 777 -R dist/nimble csources_v2
     popd
+    mkdir -p vendor/zerokit/target/${androidArch}/release
+    cp ${zerokitPkg}/librln.so vendor/zerokit/target/${androidArch}/release/
   '';
 
   installPhase = ''
