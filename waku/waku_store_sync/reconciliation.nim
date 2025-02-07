@@ -47,7 +47,7 @@ type SyncReconciliation* = ref object of LPProtocol
   storage: SyncStorage
 
   # Receive IDs from transfer protocol for storage
-  idsRx: AsyncQueue[SyncID]
+  idsRx: AsyncQueue[(SyncID, uint16)]
 
   # Send Hashes to transfer protocol for reception
   localWantsTx: AsyncQueue[(PeerId, WakuMessageHash)]
@@ -67,25 +67,80 @@ type SyncReconciliation* = ref object of LPProtocol
 
 proc messageIngress*(
     self: SyncReconciliation, pubsubTopic: PubsubTopic, msg: WakuMessage
-) =
+): Result[void, string] =
   let msgHash = computeMessageHash(pubsubTopic, msg)
 
   let id = SyncID(time: msg.timestamp, hash: msgHash)
 
-  self.storage.insert(id).isOkOr:
-    error "failed to insert new message", msg_hash = msgHash.toHex(), err = error
+  let parseRes = RelayShard.parse(pubsubTopic)
+
+  if parseRes.isErr():
+    return err("failed to parse pubsub topic: " & $pubsubTopic)
+
+  let shard = parseRes.get().shardId
+
+  self.storage.insert(id, shard).isOkOr:
+    return err(
+      "failed to insert new message: msg_hash: " & $msgHash.toHex() & " error: " & $error
+    )
 
 proc messageIngress*(
-    self: SyncReconciliation, msgHash: WakuMessageHash, msg: WakuMessage
-) =
+    self: SyncReconciliation, msgHash: WakuMessageHash, msg: WakuMessage, shard: uint16
+): Result[void, string] =
   let id = SyncID(time: msg.timestamp, hash: msgHash)
 
-  self.storage.insert(id).isOkOr:
-    error "failed to insert new message", msg_hash = msgHash.toHex(), err = error
+  self.storage.insert(id, shard).isOkOr:
+    return err(
+      "failed to insert new message: msg_hash: " & $id.hash.toHex() & " error: " & $error
+    )
 
-proc messageIngress*(self: SyncReconciliation, id: SyncID) =
-  self.storage.insert(id).isOkOr:
-    error "failed to insert new message", msg_hash = id.hash.toHex(), err = error
+proc messageIngress*(
+    self: SyncReconciliation, id: SyncID, shard: uint16
+): Result[void, string] =
+  self.storage.insert(id, shard).isOkOr:
+    return err(
+      "failed to insert new message: msg_hash: " & $id.hash.toHex() & " error: " & $error
+    )
+
+proc preProcessPayload(
+    self: SyncReconciliation, payload: RangesData
+): Option[RangesData] =
+  ## Check the received payload for cluster, shards and/or time mismatch.
+
+  var payload = payload
+
+  if self.cluster != payload.cluster:
+    return none(RangesData)
+
+  let shardsIntersection = self.shards * payload.shards.toPackedSet()
+
+  if shardsIntersection.len < 1:
+    return none(RangesData)
+
+  payload.shards = shardsIntersection.toSeq()
+
+  let timeRange = calculateTimeRange(self.relayJitter, self.syncRange)
+  let selfLowerBound = timeRange.a
+
+  # for non skip ranges check if they happen before any of our ranges
+  # convert to skip range before processing
+  for i in 0 ..< payload.ranges.len:
+    let rangeType = payload.ranges[i][1]
+    if rangeType != RangeType.Skip:
+      continue
+
+    let upperBound = payload.ranges[i][0].b.time
+    if selfLowerBound > upperBound:
+      payload.ranges[i][1] = RangeType.Skip
+
+      if rangeType == RangeType.Fingerprint:
+        payload.fingerprints.delete(0)
+      elif rangeType == RangeType.ItemSet:
+        payload.itemSets.delete(0)
+    else:
+      break
+
+  return some(payload)
 
 proc processRequest(
     self: SyncReconciliation, conn: Connection
@@ -120,10 +175,12 @@ proc processRequest(
       sendPayload: RangesData
       rawPayload: seq[byte]
 
-    # Only process the ranges IF the shards and cluster matches
-    if self.cluster == recvPayload.cluster and
-        recvPayload.shards.toPackedSet() == self.shards:
-      sendPayload = self.storage.processPayload(recvPayload, hashToSend, hashToRecv)
+    let preProcessedPayloadRes = self.preProcessPayload(recvPayload)
+    if preProcessedPayloadRes.isSome():
+      let preProcessedPayload = preProcessedPayloadRes.get()
+
+      sendPayload =
+        self.storage.processPayload(preProcessedPayload, hashToSend, hashToRecv)
 
       sendPayload.cluster = self.cluster
       sendPayload.shards = self.shards.toSeq()
@@ -171,7 +228,7 @@ proc initiate(
     upper = SyncID(time: timeRange.b, hash: FullFingerprint)
     bounds = lower .. upper
 
-    fingerprint = self.storage.computeFingerprint(bounds)
+    fingerprint = self.storage.computeFingerprint(bounds, self.shards)
     initPayload = RangesData(
       cluster: self.cluster,
       shards: self.shards.toSeq(),
@@ -229,7 +286,7 @@ proc storeSynchronization*(
 
 proc initFillStorage(
     syncRange: timer.Duration, wakuArchive: WakuArchive
-): Future[Result[seq[SyncID], string]] {.async.} =
+): Future[Result[(seq[SyncID], seq[uint16]), string]] {.async.} =
   if wakuArchive.isNil():
     return err("waku archive unavailable")
 
@@ -250,6 +307,7 @@ proc initFillStorage(
   debug "initial storage filling started"
 
   var ids = newSeq[SyncID](DefaultStorageCap)
+  var shards = newSeq[uint16](DefaultStorageCap)
 
   # we assume IDs are in order
 
@@ -260,8 +318,18 @@ proc initFillStorage(
     for i in 0 ..< response.hashes.len:
       let hash = response.hashes[i]
       let msg = response.messages[i]
+      let topic = response.topics[i]
+
+      let parseRes = RelayShard.parse(topic)
+
+      if parseRes.isErr():
+        error "failed to parse pubsub topic", pubsubTopic = topic
+        continue
+
+      let shard = parseRes.get().shardId
 
       ids.add(SyncID(time: msg.timestamp, hash: hash))
+      shards.add(shard)
 
     if response.cursor.isNone():
       break
@@ -270,7 +338,7 @@ proc initFillStorage(
 
   debug "initial storage filling done", elements = ids.len
 
-  return ok(ids)
+  return ok((ids, shards))
 
 proc new*(
     T: type SyncReconciliation,
@@ -281,7 +349,7 @@ proc new*(
     syncRange: timer.Duration = DefaultSyncRange,
     syncInterval: timer.Duration = DefaultSyncInterval,
     relayJitter: timer.Duration = DefaultGossipSubJitter,
-    idsRx: AsyncQueue[SyncID],
+    idsRx: AsyncQueue[(SyncID, uint16)],
     localWantsTx: AsyncQueue[(PeerId, WakuMessageHash)],
     remoteNeedsTx: AsyncQueue[(PeerId, WakuMessageHash)],
 ): Future[Result[T, string]] {.async.} =
@@ -291,7 +359,8 @@ proc new*(
       warn "will not sync messages before this point in time", error = res.error
       SeqStorage.new(DefaultStorageCap)
     else:
-      SeqStorage.new(res.get())
+      let (ele, shar) = res.get()
+      SeqStorage.new(ele, shar)
 
   var sync = SyncReconciliation(
     cluster: cluster,
@@ -352,9 +421,10 @@ proc periodicPrune(self: SyncReconciliation) {.async.} =
 
 proc idsReceiverLoop(self: SyncReconciliation) {.async.} =
   while true: # infinite loop
-    let id = await self.idsRx.popfirst()
+    let (id, shard) = await self.idsRx.popfirst()
 
-    self.messageIngress(id)
+    self.messageIngress(id, shard).isOkOr:
+      error "message ingress failed", error = error
 
 proc start*(self: SyncReconciliation) =
   if self.started:

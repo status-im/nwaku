@@ -1,4 +1,8 @@
-import std/[algorithm, sequtils, math, options], results, chronos, stew/arrayops
+import
+  std/[algorithm, sequtils, math, options, packedsets, sugar],
+  results,
+  chronos,
+  stew/arrayops
 
 import
   ../../waku_core/time,
@@ -9,6 +13,7 @@ import
 
 type SeqStorage* = ref object of SyncStorage
   elements: seq[SyncID]
+  shards: seq[uint16]
 
   # Numer of parts a range will be splitted into.
   partitionCount: int
@@ -19,34 +24,42 @@ type SeqStorage* = ref object of SyncStorage
 method length*(self: SeqStorage): int =
   return self.elements.len
 
-method insert*(self: SeqStorage, element: SyncID): Result[void, string] {.raises: [].} =
+method insert*(
+    self: SeqStorage, element: SyncID, shard: uint16
+): Result[void, string] {.raises: [].} =
   let idx = self.elements.lowerBound(element, common.cmp)
 
   if idx < self.elements.len and self.elements[idx] == element:
     return err("duplicate element")
 
   self.elements.insert(element, idx)
+  self.shards.insert(shard, idx)
 
   return ok()
 
 method batchInsert*(
-    self: SeqStorage, elements: seq[SyncID]
+    self: SeqStorage, elements: seq[SyncID], shards: seq[uint16]
 ): Result[void, string] {.raises: [].} =
   ## Insert the sorted seq of new elements.
 
   if elements.len == 1:
-    return self.insert(elements[0])
-
-  #TODO custom impl. ???
+    return self.insert(elements[0], shards[0])
 
   if not elements.isSorted(common.cmp):
     return err("seq not sorted")
 
-  var merged = newSeqOfCap[SyncID](self.elements.len + elements.len)
+  var idx = 0
+  for i in 0 ..< elements.len:
+    let element = elements[i]
+    let shard = shards[i]
 
-  merged.merge(self.elements, elements, common.cmp)
+    idx = self.elements[idx ..< self.elements.len].lowerBound(element, common.cmp)
 
-  self.elements = merged.deduplicate(true)
+    if self.elements[idx] == element:
+      continue
+
+    self.elements.insert(element, idx)
+    self.shards.insert(shard, idx)
 
   return ok()
 
@@ -62,11 +75,12 @@ method prune*(self: SeqStorage, timestamp: Timestamp): int {.raises: [].} =
   let idx = self.elements.lowerBound(bound, common.cmp)
 
   self.elements.delete(0 ..< idx)
+  self.shards.delete(0 ..< idx)
 
   return idx
 
 proc computefingerprintFromSlice(
-    self: SeqStorage, sliceOpt: Option[Slice[int]]
+    self: SeqStorage, sliceOpt: Option[Slice[int]], shardSet: PackedSet[uint16]
 ): Fingerprint =
   ## XOR all hashes of a slice of the storage.
 
@@ -77,15 +91,22 @@ proc computefingerprintFromSlice(
 
   let idxSlice = sliceOpt.get()
 
-  for id in self.elements[idxSlice]:
+  let elementSlice = self.elements[idxSlice]
+  let shardSlice = self.shards[idxSlice]
+
+  for i in 0 ..< elementSlice.len:
+    let id = elementSlice[i]
+    let shard = shardSlice[i]
+
+    if not shardSet.contains(shard):
+      continue
+
     fingerprint = fingerprint xor id.hash
 
   return fingerprint
 
 proc findIdxBounds(self: SeqStorage, slice: Slice[SyncID]): Option[Slice[int]] =
   ## Given bounds find the corresponding indices in this storage
-
-  #TODO can thoses 2 binary search be combined for efficiency ???
 
   let lower = self.elements.lowerBound(slice.a, common.cmp)
   var upper = self.elements.upperBound(slice.b, common.cmp)
@@ -101,21 +122,22 @@ proc findIdxBounds(self: SeqStorage, slice: Slice[SyncID]): Option[Slice[int]] =
   return some(lower ..< upper)
 
 method computeFingerprint*(
-    self: SeqStorage, bounds: Slice[SyncID]
+    self: SeqStorage, bounds: Slice[SyncID], shardSet: PackedSet[uint16]
 ): Fingerprint {.raises: [].} =
   let idxSliceOpt = self.findIdxBounds(bounds)
-  return self.computefingerprintFromSlice(idxSliceOpt)
+  return self.computefingerprintFromSlice(idxSliceOpt, shardSet)
 
 proc processFingerprintRange*(
     self: SeqStorage,
     inputBounds: Slice[SyncID],
+    shardSet: PackedSet[uint16],
     inputFingerprint: Fingerprint,
     output: var RangesData,
 ) {.raises: [].} =
   ## Compares fingerprints and partition new ranges.
 
   let idxSlice = self.findIdxBounds(inputBounds)
-  let ourFingerprint = self.computeFingerprintFromSlice(idxSlice)
+  let ourFingerprint = self.computeFingerprintFromSlice(idxSlice, shardSet)
 
   if ourFingerprint == inputFingerprint:
     output.ranges.add((inputBounds, RangeType.Skip))
@@ -131,7 +153,13 @@ proc processFingerprintRange*(
 
   if slice.len <= self.lengthThreshold:
     output.ranges.add((inputBounds, RangeType.ItemSet))
-    let state = ItemSet(elements: self.elements[slice], reconciled: false)
+
+    let elements = collect(newSeq):
+      for i in slice:
+        if shardSet.contains(self.shards[i]):
+          self.elements[i]
+
+    let state = ItemSet(elements: elements, reconciled: false)
     output.itemSets.add(state)
     return
 
@@ -149,11 +177,17 @@ proc processFingerprintRange*(
 
     if slice.len <= self.lengthThreshold:
       output.ranges.add((partitionBounds, RangeType.ItemSet))
-      let state = ItemSet(elements: self.elements[slice], reconciled: false)
+
+      let elements = collect(newSeq):
+        for i in slice:
+          if shardSet.contains(self.shards[i]):
+            self.elements[i]
+
+      let state = ItemSet(elements: elements, reconciled: false)
       output.itemSets.add(state)
       continue
 
-    let fingerprint = self.computeFingerprintFromSlice(some(slice))
+    let fingerprint = self.computeFingerprintFromSlice(some(slice), shardSet)
     output.ranges.add((partitionBounds, RangeType.Fingerprint))
     output.fingerprints.add(fingerprint)
     continue
@@ -161,6 +195,7 @@ proc processFingerprintRange*(
 proc processItemSetRange*(
     self: SeqStorage,
     inputBounds: Slice[SyncID],
+    shardSet: PackedSet[uint16],
     inputItemSet: ItemSet,
     hashToSend: var seq[Fingerprint],
     hashToRecv: var seq[Fingerprint],
@@ -190,6 +225,11 @@ proc processItemSetRange*(
 
   while (j < m):
     let ourElement = self.elements[j]
+    let shard = self.shards[j]
+
+    if not shardSet.contains(shard):
+      j.inc()
+      continue
 
     if i >= n:
       # in case we have more elements
@@ -217,7 +257,13 @@ proc processItemSetRange*(
 
   if not inputItemSet.reconciled:
     output.ranges.add((inputBounds, RangeType.ItemSet))
-    let state = ItemSet(elements: self.elements[slice], reconciled: true)
+
+    let elements = collect(newSeq):
+      for i in slice:
+        if shardSet.contains(self.shards[i]):
+          self.elements[i]
+
+    let state = ItemSet(elements: elements, reconciled: true)
     output.itemSets.add(state)
   else:
     output.ranges.add((inputBounds, RangeType.Skip))
@@ -234,6 +280,8 @@ method processPayload*(
     i = 0
     j = 0
 
+  let shardSet = input.shards.toPackedSet()
+
   for (bounds, rangeType) in input.ranges:
     case rangeType
     of RangeType.Skip:
@@ -244,14 +292,16 @@ method processPayload*(
       let fingerprint = input.fingerprints[i]
       i.inc()
 
-      self.processFingerprintRange(bounds, fingerprint, output)
+      self.processFingerprintRange(bounds, shardSet, fingerprint, output)
 
       continue
     of RangeType.ItemSet:
       let itemSet = input.itemsets[j]
       j.inc()
 
-      self.processItemSetRange(bounds, itemSet, hashToSend, hashToRecv, output)
+      self.processItemSetRange(
+        bounds, shardSet, itemSet, hashToSend, hashToRecv, output
+      )
 
       continue
 
@@ -295,8 +345,15 @@ proc new*(T: type SeqStorage, capacity: int, threshold = 100, partitions = 8): T
   )
 
 proc new*(
-    T: type SeqStorage, elements: seq[SyncID], threshold = 100, partitions = 8
+    T: type SeqStorage,
+    elements: seq[SyncID],
+    shards: seq[uint16],
+    threshold = 100,
+    partitions = 8,
 ): T =
   return SeqStorage(
-    elements: elements, lengthThreshold: threshold, partitionCount: partitions
+    elements: elements,
+    shards: shards,
+    lengthThreshold: threshold,
+    partitionCount: partitions,
   )

@@ -1,16 +1,16 @@
-import results
+import std/packedsets, results
 
 import ../../waku_core/time, ../common
 
 type SyncStorage* = ref object of RootObj
 
 method insert*(
-    self: SyncStorage, element: SyncID
+    self: SyncStorage, element: SyncID, shard: uint16
 ): Result[void, string] {.base, gcsafe, raises: [].} =
   return err("insert method not implemented for SyncStorage")
 
 method batchInsert*(
-    self: SyncStorage, elements: seq[SyncID]
+    self: SyncStorage, elements: seq[SyncID], shards: seq[uint16]
 ): Result[void, string] {.base, gcsafe, raises: [].} =
   return err("batchInsert method not implemented for SyncStorage")
 
@@ -20,7 +20,7 @@ method prune*(
   -1
 
 method computeFingerprint*(
-    self: SyncStorage, bounds: Slice[SyncID]
+    self: SyncStorage, bounds: Slice[SyncID], shardSet: PackedSet[uint16]
 ): Fingerprint {.base, gcsafe, raises: [].} =
   return EmptyFingerprint
 

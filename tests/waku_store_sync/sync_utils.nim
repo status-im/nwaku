@@ -22,7 +22,7 @@ proc randomHash*(rng: var Rand): WakuMessageHash =
 
 proc newTestWakuRecon*(
     switch: Switch,
-    idsRx: AsyncQueue[SyncID],
+    idsRx: AsyncQueue[(SyncID, uint16)],
     wantsTx: AsyncQueue[(PeerId, Fingerprint)],
     needsTx: AsyncQueue[(PeerId, Fingerprint)],
     cluster: uint16 = 1,
@@ -50,7 +50,7 @@ proc newTestWakuRecon*(
 
 proc newTestWakuTransfer*(
     switch: Switch,
-    idsTx: AsyncQueue[SyncID],
+    idsTx: AsyncQueue[(SyncID, uint16)],
     wantsRx: AsyncQueue[(PeerId, Fingerprint)],
     needsRx: AsyncQueue[(PeerId, Fingerprint)],
 ): SyncTransfer =
