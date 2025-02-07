@@ -168,7 +168,7 @@
 	path = vendor/db_connector
 	url = https://github.com/nim-lang/db_connector.git
 	ignore = untracked
-	branch = master
+	branch = devel
 [submodule "vendor/nph"]
 	ignore = untracked
 	branch = master
