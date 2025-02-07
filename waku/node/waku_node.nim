@@ -12,6 +12,7 @@ import
   bearssl/rand,
   eth/p2p/discoveryv5/enr,
   libp2p/crypto/crypto,
+  libp2p/crypto/curve25519,
   libp2p/protocols/ping,
   libp2p/protocols/pubsub/gossipsub,
   libp2p/protocols/pubsub/rpc/messages,
@@ -126,6 +127,7 @@ type
     contentTopicHandlers: Table[ContentTopic, TopicHandler]
     rateLimitSettings*: ProtocolRateLimitSettings
     mix*: MixProtocol
+    mixbootNodes*: Table[PeerId, MixPubInfo]
 
 proc new*(
     T: type WakuNode,
@@ -212,24 +214,20 @@ proc mountSharding*(
   return ok()
 
  # Mix Protocol
-proc mountMix*(node: WakuNode): Result[void, string] =
+proc mountMix*(node: WakuNode, mixPrivKey: string): Future[Result[void, string]] {.async.}  =
   info "mounting mix protocol" #TODO log the config used
-
-  var mixNodes = initTable[PeerId, MixPubInfo]()
-  # TODO: pass bootstrap node info here as mixNodes
-
-  let keyPairResult = generateKeyPair()
-  if keyPairResult.isErr:
-    return err("Generate key pair error: " & $keyPairResult.error)
-  let (mixPrivKey, mixPubKey) = keyPairResult.get()
+  let mixKey = nimcrypto.fromHex(mixPrivKey).intoCurve25519Key()
+  let mixPubKey = public(mixKey)
 
   let localaddrStr = node.announcedAddresses[0].toString().valueOr:
     return err("Failed to convert multiaddress to string.")
 
   let localMixNodeInfo = initMixNodeInfo(
-    localaddrStr, mixPubKey, mixPrivKey, node.switch.peerInfo.publicKey.skkey,
+    localaddrStr, mixPubKey, mixKey, node.switch.peerInfo.publicKey.skkey,
     node.switch.peerInfo.privateKey.skkey,
   )
+  let mixNodes = initTable[PeerId, MixPubInfo]()
+  #mixNodes[""]= 
 
   let protoRes = MixProtocol.initMix(localMixNodeInfo, node.switch, mixNodes)
   if protoRes.isErr:
