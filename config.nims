@@ -7,12 +7,18 @@ else:
 
 if defined(windows):
   switch("passL", "rln.lib")
+  switch("define", "postgres=false")
+  # Exclude postgres-related files from compilation
 
   # Automatically add all vendor subdirectories
   for dir in walkDir("./vendor"):
     if dir.kind == pcDir:
       switch("path", dir.path)
       switch("path", dir.path / "src")
+
+  switch("path", "./vendor/nim-nat-traversal")
+  switch("path", "./vendor/nim-nat-traversal/vendor/libnatpmp-upstream")
+  switch("path", "./vendor/nim-nat-traversal/vendor/miniupnp/miniupnpc")
 
   # disable timestamps in Windows PE headers - https://wiki.debian.org/ReproducibleBuilds/TimestampsInPEBinaries
   switch("passL", "-Wl,--no-insert-timestamp")
