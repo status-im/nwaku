@@ -189,3 +189,7 @@
 	url = https://github.com/vacp2p/nim-ngtcp2.git
 	ignore = untracked
 	branch = master
+[submodule "vendor/mix"]
+	path = vendor/mix
+	url = https://github.com/vacp2p/mix/
+	branch = mix-hybrid

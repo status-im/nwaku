@@ -422,6 +422,17 @@ proc setupProtocols(
       return
         err("failed to set node waku peer-exchange peer: " & peerExchangeNode.error)
 
+  #mount mix
+  let mixPrivKey:string =
+    if conf.mixkey.isSome():
+      conf.mixkey.get()
+    else:
+      error "missing mix key"
+      return err("missing mix key")
+  (
+    await node.mountMix(mixPrivKey)
+  ).isOkOr:
+    return err("failed to mount waku mix protocol: " & $error)
   return ok()
 
 ## Start node

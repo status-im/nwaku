@@ -12,6 +12,7 @@ import
   bearssl/rand,
   eth/p2p/discoveryv5/enr,
   libp2p/crypto/crypto,
+  libp2p/crypto/curve25519,
   libp2p/protocols/ping,
   libp2p/protocols/pubsub/gossipsub,
   libp2p/protocols/pubsub/rpc/messages,
@@ -20,7 +21,13 @@ import
   libp2p/builders,
   libp2p/transports/transport,
   libp2p/transports/tcptransport,
-  libp2p/transports/wstransport
+  libp2p/transports/wstransport,
+  ../../vendor/mix/src/mix_node,
+  ../../vendor/mix/src/mix_protocol,
+  ../../vendor/mix/src/curve25519,
+  ../../vendor/mix/src/protocol
+
+
 import
   ../waku_core,
   ../waku_core/topics/sharding,
@@ -119,6 +126,8 @@ type
     topicSubscriptionQueue*: AsyncEventQueue[SubscriptionEvent]
     contentTopicHandlers: Table[ContentTopic, TopicHandler]
     rateLimitSettings*: ProtocolRateLimitSettings
+    mix*: MixProtocol
+    mixbootNodes*: Table[PeerId, MixPubInfo]
 
 proc new*(
     T: type WakuNode,
@@ -202,6 +211,45 @@ proc mountSharding*(
 ): Result[void, string] =
   info "mounting sharding", clusterId = clusterId, shardCount = shardCount
   node.wakuSharding = Sharding(clusterId: clusterId, shardCountGenZero: shardCount)
+  return ok()
+
+ # Mix Protocol
+proc mountMix*(node: WakuNode, mixPrivKey: string): Future[Result[void, string]] {.async.}  =
+  info "mounting mix protocol" #TODO log the config used
+  let mixKey = nimcrypto.fromHex(mixPrivKey).intoCurve25519Key()
+  let mixPubKey = public(mixKey)
+
+  let localaddrStr = node.announcedAddresses[0].toString().valueOr:
+    return err("Failed to convert multiaddress to string.")
+
+  let localMixNodeInfo = initMixNodeInfo(
+    localaddrStr, mixPubKey, mixKey, node.switch.peerInfo.publicKey.skkey,
+    node.switch.peerInfo.privateKey.skkey,
+  )
+  let mixNodes = initTable[PeerId, MixPubInfo]()
+  #mixNodes[""]= 
+
+  let protoRes = MixProtocol.initMix(localMixNodeInfo, node.switch, mixNodes)
+  if protoRes.isErr:
+    error "Mix protocol initialization failed", err = protoRes.error
+    return
+  node.mix = protoRes.value
+
+  var sendHandlerFunc = proc(
+      conn: Connection, proto: ProtocolType
+  ): Future[void] {.async.} =
+    try:
+      await callHandler(node.switch, conn, proto) # Call handler on the switch
+    except CatchableError as e:
+      error "Error during execution of MixProtocol handler: ", err = e.msg
+    return
+  node.mix.setCallback(sendHandlerFunc)
+
+  let catchRes = catch:
+    node.switch.mount(node.mix)
+  if catchRes.isErr():
+    return err(catchRes.error.msg)
+
   return ok()
 
 ## Waku Sync
