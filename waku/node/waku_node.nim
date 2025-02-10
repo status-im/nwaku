@@ -9,9 +9,11 @@ import
   stew/byteutils,
   eth/keys,
   nimcrypto,
+  nimcrypto/utils as ncrutils,
   bearssl/rand,
   eth/p2p/discoveryv5/enr,
   libp2p/crypto/crypto,
+  libp2p/crypto/curve25519,
   libp2p/protocols/ping,
   libp2p/protocols/pubsub/gossipsub,
   libp2p/protocols/pubsub/rpc/messages,
@@ -20,7 +22,13 @@ import
   libp2p/builders,
   libp2p/transports/transport,
   libp2p/transports/tcptransport,
-  libp2p/transports/wstransport
+  libp2p/transports/wstransport,
+  ../../vendor/mix/src/mix_node,
+  ../../vendor/mix/src/mix_protocol,
+  ../../vendor/mix/src/curve25519,
+  ../../vendor/mix/src/protocol
+
+
 import
   ../waku_core,
   ../waku_core/topics/sharding,
@@ -119,6 +127,8 @@ type
     topicSubscriptionQueue*: AsyncEventQueue[SubscriptionEvent]
     contentTopicHandlers: Table[ContentTopic, TopicHandler]
     rateLimitSettings*: ProtocolRateLimitSettings
+    mix*: MixProtocol
+    mixbootNodes*: Table[PeerId, MixPubInfo]
 
 proc new*(
     T: type WakuNode,
@@ -202,6 +212,74 @@ proc mountSharding*(
 ): Result[void, string] =
   info "mounting sharding", clusterId = clusterId, shardCount = shardCount
   node.wakuSharding = Sharding(clusterId: clusterId, shardCountGenZero: shardCount)
+  return ok()
+
+proc getBootStrapMixNodes(node: WakuNode, exceptPeerID: PeerId): Table[PeerId, MixPubInfo] =
+  var mixNodes = initTable[PeerId, MixPubInfo]()
+  # MixNode Multiaddrs and PublicKeys:
+  let bootNodesMultiaddrs = ["/ip4/127.0.0.1/tcp/60001/p2p/16Uiu2HAmPiEs2ozjjJF2iN2Pe2FYeMC9w4caRHKYdLdAfjgbWM6o",
+                             "/ip4/127.0.0.1/tcp/60002/p2p/16Uiu2HAmLtKaFaSWDohToWhWUZFLtqzYZGPFuXwKrojFVF6az5UF",
+                             "/ip4/127.0.0.1/tcp/60003/p2p/16Uiu2HAmTEDHwAziWUSz6ZE23h5vxG2o4Nn7GazhMor4bVuMXTrA",
+                             "/ip4/127.0.0.1/tcp/60004/p2p/16Uiu2HAmPwRKZajXtfb1Qsv45VVfRZgK3ENdfmnqzSrVm3BczF6f",
+                             "/ip4/127.0.0.1/tcp/60005/p2p/16Uiu2HAmRhxmCHBYdXt1RibXrjAUNJbduAhzaTHwFCZT4qWnqZAu",
+                             ]
+  let bootNodesMixPubKeys = ["9d09ce624f76e8f606265edb9cca2b7de9b41772a6d784bddaf92ffa8fba7d2c",
+                             "9231e86da6432502900a84f867004ce78632ab52cd8e30b1ec322cd795710c2a",
+                             "275cd6889e1f29ca48e5b9edb800d1a94f49f13d393a0ecf1a07af753506de6c",
+                             "e0ed594a8d506681be075e8e23723478388fb182477f7a469309a25e7076fc18",
+                             "8fd7a1a7c19b403d231452a9b1ea40eb1cc76f455d918ef8980e7685f9eeeb1f"
+                             ]
+  for index, mixNodeMultiaddr in bootNodesMultiaddrs:
+    let peerIdRes = getPeerIdFromMultiAddr(mixNodeMultiaddr)
+    if peerIdRes.isErr:
+       error "Failed to get peer id from multiaddress: " , error = peerIdRes.error
+    let peerId = peerIdRes.get()
+    if peerID == exceptPeerID:
+      continue
+    let mixNodePubInfo = createMixPubInfo(mixNodeMultiaddr, intoCurve25519Key(ncrutils.fromHex(bootNodesMixPubKeys[index])))
+
+    mixNodes[peerId] = mixNodePubInfo
+  info "using mix bootstrap nodes ", bootNodes = mixNodes
+  return mixNodes
+
+
+ # Mix Protocol
+proc mountMix*(node: WakuNode, mixPrivKey: string): Future[Result[void, string]] {.async.}  =
+  info "mounting mix protocol", nodeId = node.info #TODO log the config used
+  info "mixPrivKey", mixPrivKey = mixPrivKey
+
+  let mixKey = intoCurve25519Key(ncrutils.fromHex(mixPrivKey))
+  let mixPubKey = public(mixKey)
+
+  let localaddrStr = node.announcedAddresses[0].toString().valueOr:
+    return err("Failed to convert multiaddress to string.")
+
+  let localMixNodeInfo = initMixNodeInfo(
+    localaddrStr, mixPubKey, mixKey, node.switch.peerInfo.publicKey.skkey,
+    node.switch.peerInfo.privateKey.skkey,
+  )
+
+  let protoRes = MixProtocol.initMix(localMixNodeInfo, node.switch, node.getBootStrapMixNodes(node.peerId))
+  if protoRes.isErr:
+    error "Mix protocol initialization failed", err = protoRes.error
+    return
+  node.mix = protoRes.value
+
+  var sendHandlerFunc = proc(
+      conn: Connection, proto: ProtocolType
+  ): Future[void] {.async.} =
+    try:
+      await callHandler(node.switch, conn, proto) # Call handler on the switch
+    except CatchableError as e:
+      error "Error during execution of MixProtocol handler: ", err = e.msg
+    return
+  node.mix.setCallback(sendHandlerFunc)
+
+  let catchRes = catch:
+    node.switch.mount(node.mix)
+  if catchRes.isErr():
+    return err(catchRes.error.msg)
+
   return ok()
 
 ## Waku Sync
