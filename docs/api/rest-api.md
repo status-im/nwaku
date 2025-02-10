@@ -38,6 +38,19 @@ A particular OpenAPI spec can be easily imported into [Postman](https://www.post
 curl http://localhost:8645/debug/v1/info -s | jq
 ```
 
+#### [`get_waku_v2_store_v3_messages`](https://rfc.vac.dev/spec/16/#get_waku_v2_store_v3_messages)
+
+```bash
+curl -v -X GET "http://127.0.0.1:49153/store/v3/messages?includeData=true&pubsubTopic=/waku/2/rs/3/0&pageSize=20&ascending=true"
+```
+
+or call it encoded
+
+```bash
+curl -v -X GET "http://127.0.0.1:5213/store/v3/messages?includeData=true&pubsubTopic=%2Fwaku%2F2%2Frs%2F3%2F0&pageSize=20&ascending=true"
+```
+
+In both cases, it works and retrieves the message with the correct topic name.
 
 ### Node configuration
 Find details [here](https://github.com/waku-org/nwaku/tree/master/docs/operators/how-to/configure-rest-api.md)

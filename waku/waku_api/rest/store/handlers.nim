@@ -99,6 +99,8 @@ proc createStoreQuery(
     let decodedPubsubTopic = decodeUrl(pubsubTopic.get())
     if decodedPubsubTopic != "":
       parsedPubsubTopic = some(decodedPubsubTopic)
+    else:
+      return err("Invalid or non-encoded pubsubTopic parameter")
 
   # Parse the content topics
   var parsedContentTopics = newSeq[ContentTopic](0)
@@ -106,6 +108,8 @@ proc createStoreQuery(
     let ctList = decodeUrl(contentTopics.get())
     if ctList != "":
       for ct in ctList.split(','):
+        if ct == "":
+          return err("Invalid or non-encoded content_topic parameter")
         parsedContentTopics.add(ct)
 
   # Parse start time
