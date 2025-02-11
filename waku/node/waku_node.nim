@@ -253,9 +253,10 @@ proc mountMix*(node: WakuNode, mixPrivKey: string): Future[Result[void, string]]
 
   let localaddrStr = node.announcedAddresses[0].toString().valueOr:
     return err("Failed to convert multiaddress to string.")
+  info "local addr", localaddr = localaddrStr
 
   let localMixNodeInfo = initMixNodeInfo(
-    localaddrStr, mixPubKey, mixKey, node.switch.peerInfo.publicKey.skkey,
+    localaddrStr & "/p2p/" & $node.peerId, mixPubKey, mixKey, node.switch.peerInfo.publicKey.skkey,
     node.switch.peerInfo.privateKey.skkey,
   )
 

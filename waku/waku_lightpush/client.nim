@@ -1,7 +1,7 @@
 {.push raises: [].}
 
 import std/options, results, chronicles, chronos, metrics, bearssl/rand, stew/byteutils
-import libp2p/peerid
+import libp2p/peerid, libp2p/stream/connection
 import
   ../waku_core/peers,
   ../node/peer_manager,
@@ -102,6 +102,24 @@ proc publishToAny*(
 
   let pushRequest = PushRequest(pubSubTopic: pubSubTopic, message: message)
   ?await wl.sendPushRequest(pushRequest, peer)
+
+  for obs in wl.publishObservers:
+    obs.onMessagePublished(pubSubTopic, message)
+
+  return ok()
+
+
+proc publishWithConn*(
+  wl: WakuLightPushClient, pubSubTopic: PubsubTopic, message: WakuMessage, conn: Connection
+): Future[WakuLightPushResult[void]] {.async, gcsafe.} =
+  ## This proc is similar to the publish one but in this case
+  ## we use existing connection to publish.
+
+  info "publishWithConn", msg_hash = computeMessageHash(pubsubTopic, message).to0xHex
+
+  let pushRequest = PushRequest(pubSubTopic: pubSubTopic, message: message)
+  let rpc = PushRPC(requestId: generateRequestId(wl.rng), request: some(pushRequest))
+  await conn.writeLP(rpc.encode().buffer)
 
   for obs in wl.publishObservers:
     obs.onMessagePublished(pubSubTopic, message)
