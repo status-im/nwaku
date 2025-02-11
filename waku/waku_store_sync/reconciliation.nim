@@ -1,7 +1,7 @@
 {.push raises: [].}
 
 import
-  std/[sequtils, options, packedsets],
+  std/[sequtils, options, packedsets, sets],
   stew/byteutils,
   results,
   chronicles,
@@ -20,6 +20,7 @@ import
   ../waku_core/codecs,
   ../waku_core/time,
   ../waku_core/topics/pubsub_topic,
+  ../waku_core/topics/content_topic,
   ../waku_core/message/digest,
   ../waku_core/message/message,
   ../node/peer_manager/peer_manager,
@@ -38,7 +39,8 @@ const DefaultStorageCap = 50_000
 
 type SyncReconciliation* = ref object of LPProtocol
   cluster: uint16
-  shards: PackedSet[uint16]
+  pubsubTopics: HashSet[PubsubTopic]
+  contentTopics: HashSet[ContentTopic]
 
   peerManager: PeerManager
 
@@ -47,7 +49,7 @@ type SyncReconciliation* = ref object of LPProtocol
   storage: SyncStorage
 
   # Receive IDs from transfer protocol for storage
-  idsRx: AsyncQueue[(SyncID, uint16)]
+  idsRx: AsyncQueue[(SyncID, PubsubTopic, ContentTopic)]
 
   # Send Hashes to transfer protocol for reception
   localWantsTx: AsyncQueue[(PeerId, WakuMessageHash)]
@@ -72,32 +74,31 @@ proc messageIngress*(
 
   let id = SyncID(time: msg.timestamp, hash: msgHash)
 
-  let parseRes = RelayShard.parse(pubsubTopic)
-
-  if parseRes.isErr():
-    return err("failed to parse pubsub topic: " & $pubsubTopic)
-
-  let shard = parseRes.get().shardId
-
-  self.storage.insert(id, shard).isOkOr:
+  self.storage.insert(id, pubsubTopic, msg.contentTopic).isOkOr:
     return err(
       "failed to insert new message: msg_hash: " & $msgHash.toHex() & " error: " & $error
     )
 
 proc messageIngress*(
-    self: SyncReconciliation, msgHash: WakuMessageHash, msg: WakuMessage, shard: uint16
+    self: SyncReconciliation,
+    msgHash: WakuMessageHash,
+    pubsubTopic: PubsubTopic,
+    msg: WakuMessage,
 ): Result[void, string] =
   let id = SyncID(time: msg.timestamp, hash: msgHash)
 
-  self.storage.insert(id, shard).isOkOr:
+  self.storage.insert(id, pubsubTopic, msg.contentTopic).isOkOr:
     return err(
       "failed to insert new message: msg_hash: " & $id.hash.toHex() & " error: " & $error
     )
 
 proc messageIngress*(
-    self: SyncReconciliation, id: SyncID, shard: uint16
+    self: SyncReconciliation,
+    id: SyncID,
+    pubsubTopic: PubsubTopic,
+    contentTopic: ContentTopic,
 ): Result[void, string] =
-  self.storage.insert(id, shard).isOkOr:
+  self.storage.insert(id, pubsubTopic, contentTopic).isOkOr:
     return err(
       "failed to insert new message: msg_hash: " & $id.hash.toHex() & " error: " & $error
     )
@@ -112,12 +113,21 @@ proc preProcessPayload(
   if self.cluster != payload.cluster:
     return none(RangesData)
 
-  let shardsIntersection = self.shards * payload.shards.toPackedSet()
+  if payload.pubsubTopics.len > 0:
+    let pubsubIntersection = self.pubsubTopics * payload.pubsubTopics.toHashSet()
 
-  if shardsIntersection.len < 1:
-    return none(RangesData)
+    if pubsubIntersection.len < 1:
+      return none(RangesData)
 
-  payload.shards = shardsIntersection.toSeq()
+    payload.pubsubTopics = pubsubIntersection.toSeq()
+
+  if payload.contentTopics.len > 0:
+    let contentIntersection = self.contentTopics * payload.contentTopics.toHashSet()
+
+    if contentIntersection.len < 1:
+      return none(RangesData)
+
+    payload.contentTopics = contentIntersection.toSeq()
 
   let timeRange = calculateTimeRange(self.relayJitter, self.syncRange)
   let selfLowerBound = timeRange.a
@@ -179,11 +189,16 @@ proc processRequest(
     if preProcessedPayloadRes.isSome():
       let preProcessedPayload = preProcessedPayloadRes.get()
 
-      sendPayload =
-        self.storage.processPayload(preProcessedPayload, hashToSend, hashToRecv)
+      sendPayload = self.storage.processPayload(
+        preProcessedPayload.cluster, preProcessedPayload.pubsubTopics,
+        preProcessedPayload.contentTopics, preProcessedPayload.ranges,
+        preProcessedPayload.fingerprints, preProcessedPayload.itemSets, hashToSend,
+        hashToRecv,
+      )
 
       sendPayload.cluster = self.cluster
-      sendPayload.shards = self.shards.toSeq()
+      sendPayload.pubsubTopics = self.pubsubTopics.toSeq()
+      sendPayload.contentTopics = self.contentTopics.toSeq()
 
       for hash in hashToSend:
         await self.remoteNeedsTx.addLast((conn.peerId, hash))
@@ -228,10 +243,13 @@ proc initiate(
     upper = SyncID(time: timeRange.b, hash: FullFingerprint)
     bounds = lower .. upper
 
-    fingerprint = self.storage.computeFingerprint(bounds, self.shards)
+    fingerprint = self.storage.computeFingerprint(
+      bounds, self.pubsubTopics.toSeq(), self.contentTopics.toSeq()
+    )
     initPayload = RangesData(
       cluster: self.cluster,
-      shards: self.shards.toSeq(),
+      pubsubTopics: self.pubsubTopics.toSeq(),
+      contentTopics: self.contentTopics.toSeq(),
       ranges: @[(bounds, RangeType.Fingerprint)],
       fingerprints: @[fingerprint],
       itemSets: @[],
@@ -286,7 +304,7 @@ proc storeSynchronization*(
 
 proc initFillStorage(
     syncRange: timer.Duration, wakuArchive: WakuArchive
-): Future[Result[(seq[SyncID], seq[uint16]), string]] {.async.} =
+): Future[Result[SeqStorage, string]] {.async.} =
   if wakuArchive.isNil():
     return err("waku archive unavailable")
 
@@ -306,8 +324,7 @@ proc initFillStorage(
 
   debug "initial storage filling started"
 
-  var ids = newSeq[SyncID](DefaultStorageCap)
-  var shards = newSeq[uint16](DefaultStorageCap)
+  var storage = SeqStorage.new(DefaultStorageCap)
 
   # we assume IDs are in order
 
@@ -318,38 +335,31 @@ proc initFillStorage(
     for i in 0 ..< response.hashes.len:
       let hash = response.hashes[i]
       let msg = response.messages[i]
-      let topic = response.topics[i]
+      let pubsubTopic = response.topics[i]
 
-      let parseRes = RelayShard.parse(topic)
-
-      if parseRes.isErr():
-        error "failed to parse pubsub topic", pubsubTopic = topic
-        continue
-
-      let shard = parseRes.get().shardId
-
-      ids.add(SyncID(time: msg.timestamp, hash: hash))
-      shards.add(shard)
+      let id = SyncID(time: msg.timestamp, hash: hash)
+      discard storage.insert(id, pubsubTopic, msg.contentTopic)
 
     if response.cursor.isNone():
       break
 
     query.cursor = response.cursor
 
-  debug "initial storage filling done", elements = ids.len
+  debug "initial storage filling done", elements = storage.length()
 
-  return ok((ids, shards))
+  return ok(storage)
 
 proc new*(
     T: type SyncReconciliation,
     cluster: uint16,
-    shards: seq[uint16],
+    pubsubTopics: seq[PubSubTopic],
+    contentTopics: seq[ContentTopic],
     peerManager: PeerManager,
     wakuArchive: WakuArchive,
     syncRange: timer.Duration = DefaultSyncRange,
     syncInterval: timer.Duration = DefaultSyncInterval,
     relayJitter: timer.Duration = DefaultGossipSubJitter,
-    idsRx: AsyncQueue[(SyncID, uint16)],
+    idsRx: AsyncQueue[(SyncID, PubsubTopic, ContentTopic)],
     localWantsTx: AsyncQueue[(PeerId, WakuMessageHash)],
     remoteNeedsTx: AsyncQueue[(PeerId, WakuMessageHash)],
 ): Future[Result[T, string]] {.async.} =
@@ -359,12 +369,12 @@ proc new*(
       warn "will not sync messages before this point in time", error = res.error
       SeqStorage.new(DefaultStorageCap)
     else:
-      let (ele, shar) = res.get()
-      SeqStorage.new(ele, shar)
+      res.get()
 
   var sync = SyncReconciliation(
     cluster: cluster,
-    shards: shards.toPackedSet(),
+    pubsubTopics: pubsubTopics.toHashSet(),
+    contentTopics: contentTopics.toHashSet(),
     peerManager: peerManager,
     storage: storage,
     syncRange: syncRange,
@@ -421,9 +431,9 @@ proc periodicPrune(self: SyncReconciliation) {.async.} =
 
 proc idsReceiverLoop(self: SyncReconciliation) {.async.} =
   while true: # infinite loop
-    let (id, shard) = await self.idsRx.popfirst()
+    let (id, pubsub, content) = await self.idsRx.popfirst()
 
-    self.messageIngress(id, shard).isOkOr:
+    self.messageIngress(id, pubsub, content).isOkOr:
       error "message ingress failed", error = error
 
 proc start*(self: SyncReconciliation) =

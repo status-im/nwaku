@@ -208,29 +208,24 @@ proc mountSharding*(
 
 proc mountStoreSync*(
     node: WakuNode,
+    cluster: uint16,
+    shards: seq[uint16],
+    contentTopics: seq[string],
     storeSyncRange = 3600,
     storeSyncInterval = 300,
     storeSyncRelayJitter = 20,
 ): Future[Result[void, string]] {.async.} =
-  let idsChannel = newAsyncQueue[(SyncID, uint16)](100)
+  let idsChannel = newAsyncQueue[(SyncID, PubsubTopic, ContentTopic)](100)
   let wantsChannel = newAsyncQueue[(PeerId, WakuMessageHash)](100)
   let needsChannel = newAsyncQueue[(PeerId, WakuMessageHash)](100)
 
-  var cluster: uint16
-  var shards: seq[uint16]
-  let enrRes = node.enr.toTyped()
-  if enrRes.isOk():
-    let shardingRes = enrRes.get().relaySharding()
-    if shardingRes.isSome():
-      let relayShard = shardingRes.get()
-      cluster = relayShard.clusterID
-      shards = relayShard.shardIds
+  let pubsubTopics = shards.mapIt($RelayShard(clusterId: cluster, shardId: it))
 
   let recon =
     ?await SyncReconciliation.new(
-      cluster, shards, node.peerManager, node.wakuArchive, storeSyncRange.seconds,
-      storeSyncInterval.seconds, storeSyncRelayJitter.seconds, idsChannel, wantsChannel,
-      needsChannel,
+      cluster, pubsubTopics, contentTopics, node.peerManager, node.wakuArchive,
+      storeSyncRange.seconds, storeSyncInterval.seconds, storeSyncRelayJitter.seconds,
+      idsChannel, wantsChannel, needsChannel,
     )
 
   node.wakuStoreReconciliation = recon

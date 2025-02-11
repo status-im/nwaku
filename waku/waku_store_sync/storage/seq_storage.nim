@@ -7,13 +7,23 @@ import
 import
   ../../waku_core/time,
   ../../waku_core/message/digest,
+  ../../waku_core/topics/pubsub_topic,
+  ../../waku_core/topics/content_topic,
   ../common,
   ./range_processing,
   ./storage
 
 type SeqStorage* = ref object of SyncStorage
   elements: seq[SyncID]
-  shards: seq[uint16]
+
+  pubsubTopicIndexes: seq[int]
+  contentTopicIndexes: seq[int]
+
+  pubsubTopics: seq[PubSubTopic]
+  contentTopics: seq[ContentTopic]
+
+  unusedPubsubTopicSet: PackedSet[int]
+  unusedContentTopicSet: PackedSet[int]
 
   # Numer of parts a range will be splitted into.
   partitionCount: int
@@ -21,29 +31,78 @@ type SeqStorage* = ref object of SyncStorage
   # Number of element in a range for which item sets are used instead of fingerprints.
   lengthThreshold: int
 
-method length*(self: SeqStorage): int =
+method length*(self: SeqStorage): int {.raises: [].} =
   return self.elements.len
 
-method insert*(
-    self: SeqStorage, element: SyncID, shard: uint16
-): Result[void, string] {.raises: [].} =
-  let idx = self.elements.lowerBound(element, common.cmp)
+proc getPubsubTopicIndex(self: SeqStorage, pubsubTopic: PubSubTopic): int =
+  for i, selfTopic in self.pubsubTopics:
+    if pubsubTopic == selfTopic:
+      return i
 
+  if self.unusedPubsubTopicSet.len > 0:
+    let unusedIdx = self.unusedPubsubTopicSet.toSeq()[0]
+    self.unusedPubsubTopicSet.excl(unusedIdx)
+    self.pubsubTopics[unusedIdx] = pubsubTopic
+    return unusedIdx
+
+  let newIdx = self.pubsubTopics.len
+  self.pubsubTopics.add(pubsubTopic)
+  return newidx
+
+proc getContentTopicIndex(self: SeqStorage, contentTopic: ContentTopic): int =
+  for i, selfTopic in self.contentTopics:
+    if contentTopic == selfTopic:
+      return i
+
+  if self.unusedContentTopicSet.len > 0:
+    let unusedIdx = self.unusedContentTopicSet.toSeq()[0]
+    self.unusedContentTopicSet.excl(unusedIdx)
+    self.contentTopics[unusedIdx] = contentTopic
+    return unusedIdx
+
+  let newIdx = self.contentTopics.len
+  self.contentTopics.add(contentTopic)
+  return newIdx
+
+proc insertAt(
+    self: SeqStorage,
+    idx: int,
+    element: SyncID,
+    pubsubTopic: PubSubTopic,
+    contentTopic: ContentTopic,
+): Result[void, string] =
   if idx < self.elements.len and self.elements[idx] == element:
     return err("duplicate element")
 
   self.elements.insert(element, idx)
-  self.shards.insert(shard, idx)
+
+  let pubsubIndex = self.getPubsubTopicIndex(pubsubTopic)
+  let contentIndex = self.getContentTopicIndex(contentTopic)
+
+  self.pubsubTopicIndexes.insert(pubsubIndex, idx)
+  self.contentTopicIndexes.insert(contentIndex, idx)
 
   return ok()
 
+method insert*(
+    self: SeqStorage,
+    element: SyncID,
+    pubsubTopic: PubSubTopic,
+    contentTopic: ContentTopic,
+): Result[void, string] {.raises: [].} =
+  let idx = self.elements.lowerBound(element, common.cmp)
+  return self.insertAt(idx, element, pubsubTopic, contentTopic)
+
 method batchInsert*(
-    self: SeqStorage, elements: seq[SyncID], shards: seq[uint16]
+    self: SeqStorage,
+    elements: seq[SyncID],
+    pubsubTopics: seq[PubSubTopic],
+    contentTopics: seq[ContentTopic],
 ): Result[void, string] {.raises: [].} =
   ## Insert the sorted seq of new elements.
 
   if elements.len == 1:
-    return self.insert(elements[0], shards[0])
+    return self.insert(elements[0], pubsubTopics[0], contentTopics[0])
 
   if not elements.isSorted(common.cmp):
     return err("seq not sorted")
@@ -51,15 +110,13 @@ method batchInsert*(
   var idx = 0
   for i in 0 ..< elements.len:
     let element = elements[i]
-    let shard = shards[i]
+    let pubsubTopic = pubsubTopics[i]
+    let contentTopic = contentTopics[i]
 
     idx = self.elements[idx ..< self.elements.len].lowerBound(element, common.cmp)
 
-    if self.elements[idx] == element:
-      continue
-
-    self.elements.insert(element, idx)
-    self.shards.insert(shard, idx)
+    # We don't care about duplicates, discard result
+    discard self.insertAt(idx, element, pubsubTopic, contentTopic)
 
   return ok()
 
@@ -75,12 +132,32 @@ method prune*(self: SeqStorage, timestamp: Timestamp): int {.raises: [].} =
   let idx = self.elements.lowerBound(bound, common.cmp)
 
   self.elements.delete(0 ..< idx)
-  self.shards.delete(0 ..< idx)
+  self.pubsubTopicIndexes.delete(0 ..< idx)
+  self.contentTopicIndexes.delete(0 ..< idx)
+
+  # Free unused content topics
+  let contentIdxSet = self.contentTopicIndexes.toPackedSet()
+  var contentTopicSet: PackedSet[int]
+  for i in 0 ..< self.contentTopics.len:
+    contentTopicSet.incl(i)
+
+  self.unusedContentTopicSet = contentTopicSet - contentIdxSet
+
+  # Free unused pubsub topics
+  let pubsubIdxSet = self.pubsubTopicIndexes.toPackedSet()
+  var pubsubTopicSet: PackedSet[int]
+  for i in 0 ..< self.pubsubTopics.len:
+    pubsubTopicSet.incl(i)
+
+  self.unusedPubsubTopicSet = pubsubTopicSet - pubsubIdxSet
 
   return idx
 
 proc computefingerprintFromSlice(
-    self: SeqStorage, sliceOpt: Option[Slice[int]], shardSet: PackedSet[uint16]
+    self: SeqStorage,
+    sliceOpt: Option[Slice[int]],
+    pubsubTopicSet: PackedSet[int],
+    contentTopicSet: PackedSet[int],
 ): Fingerprint =
   ## XOR all hashes of a slice of the storage.
 
@@ -92,13 +169,18 @@ proc computefingerprintFromSlice(
   let idxSlice = sliceOpt.get()
 
   let elementSlice = self.elements[idxSlice]
-  let shardSlice = self.shards[idxSlice]
+  let pubsubSlice = self.pubsubTopicIndexes[idxSlice]
+  let contentSlice = self.contentTopicIndexes[idxSlice]
 
   for i in 0 ..< elementSlice.len:
     let id = elementSlice[i]
-    let shard = shardSlice[i]
+    let pubsub = pubsubSlice[i]
+    let content = contentSlice[i]
 
-    if not shardSet.contains(shard):
+    if pubsub notin pubsubTopicSet:
+      continue
+
+    if content notin contentTopicSet:
       continue
 
     fingerprint = fingerprint xor id.hash
@@ -122,22 +204,58 @@ proc findIdxBounds(self: SeqStorage, slice: Slice[SyncID]): Option[Slice[int]] =
   return some(lower ..< upper)
 
 method computeFingerprint*(
-    self: SeqStorage, bounds: Slice[SyncID], shardSet: PackedSet[uint16]
+    self: SeqStorage,
+    bounds: Slice[SyncID],
+    pubsubTopics: seq[PubsubTopic],
+    contentTopics: seq[ContentTopic],
 ): Fingerprint {.raises: [].} =
   let idxSliceOpt = self.findIdxBounds(bounds)
-  return self.computefingerprintFromSlice(idxSliceOpt, shardSet)
+
+  var pubsubTopicSet = initPackedSet[int]()
+  for inputTopic in pubsubTopics:
+    for i, localTopic in self.pubsubTopics:
+      if inputTopic == localTopic:
+        pubsubTopicSet.incl(i)
+
+  var contentTopicSet = initPackedSet[int]()
+  for inputTopic in contentTopics:
+    for i, localTopic in self.contentTopics:
+      if inputTopic == localTopic:
+        contentTopicSet.incl(i)
+
+  return self.computefingerprintFromSlice(idxSliceOpt, pubsubTopicSet, contentTopicSet)
+
+proc getFilteredElements(
+    self: SeqStorage,
+    slice: Slice[int],
+    pubsubTopicSet: PackedSet[int],
+    contentTopicSet: PackedSet[int],
+): seq[SyncID] =
+  let elements = collect(newSeq):
+    for i in slice:
+      if pubsubTopicSet.len > 0 and self.pubsubTopicIndexes[i] notin pubsubTopicSet:
+        continue
+
+      if contentTopicSet.len > 0 and self.contentTopicIndexes[i] notin contentTopicSet:
+        continue
+
+      self.elements[i]
+
+  elements
 
 proc processFingerprintRange*(
     self: SeqStorage,
     inputBounds: Slice[SyncID],
-    shardSet: PackedSet[uint16],
+    pubsubTopicSet: PackedSet[int],
+    contentTopicSet: PackedSet[int],
     inputFingerprint: Fingerprint,
     output: var RangesData,
 ) {.raises: [].} =
   ## Compares fingerprints and partition new ranges.
 
   let idxSlice = self.findIdxBounds(inputBounds)
-  let ourFingerprint = self.computeFingerprintFromSlice(idxSlice, shardSet)
+  let ourFingerprint =
+    self.computeFingerprintFromSlice(idxSlice, pubsubTopicSet, contentTopicSet)
 
   if ourFingerprint == inputFingerprint:
     output.ranges.add((inputBounds, RangeType.Skip))
@@ -153,12 +271,7 @@ proc processFingerprintRange*(
 
   if slice.len <= self.lengthThreshold:
     output.ranges.add((inputBounds, RangeType.ItemSet))
-
-    let elements = collect(newSeq):
-      for i in slice:
-        if shardSet.contains(self.shards[i]):
-          self.elements[i]
-
+    let elements = self.getFilteredElements(slice, pubsubTopicSet, contentTopicSet)
     let state = ItemSet(elements: elements, reconciled: false)
     output.itemSets.add(state)
     return
@@ -177,17 +290,13 @@ proc processFingerprintRange*(
 
     if slice.len <= self.lengthThreshold:
       output.ranges.add((partitionBounds, RangeType.ItemSet))
-
-      let elements = collect(newSeq):
-        for i in slice:
-          if shardSet.contains(self.shards[i]):
-            self.elements[i]
-
+      let elements = self.getFilteredElements(slice, pubsubTopicSet, contentTopicSet)
       let state = ItemSet(elements: elements, reconciled: false)
       output.itemSets.add(state)
       continue
 
-    let fingerprint = self.computeFingerprintFromSlice(some(slice), shardSet)
+    let fingerprint =
+      self.computeFingerprintFromSlice(some(slice), pubsubTopicSet, contentTopicSet)
     output.ranges.add((partitionBounds, RangeType.Fingerprint))
     output.fingerprints.add(fingerprint)
     continue
@@ -195,7 +304,8 @@ proc processFingerprintRange*(
 proc processItemSetRange*(
     self: SeqStorage,
     inputBounds: Slice[SyncID],
-    shardSet: PackedSet[uint16],
+    pubsubTopicSet: PackedSet[int],
+    contentTopicSet: PackedSet[int],
     inputItemSet: ItemSet,
     hashToSend: var seq[Fingerprint],
     hashToRecv: var seq[Fingerprint],
@@ -225,9 +335,14 @@ proc processItemSetRange*(
 
   while (j < m):
     let ourElement = self.elements[j]
-    let shard = self.shards[j]
+    let pubsub = self.pubsubTopicIndexes[j]
+    let content = self.contentTopicIndexes[j]
 
-    if not shardSet.contains(shard):
+    if pubsubTopicSet.len > 0 and pubsub notin pubsubTopicSet:
+      j.inc()
+      continue
+
+    if contentTopicSet.len > 0 and content notin contentTopicSet:
       j.inc()
       continue
 
@@ -257,12 +372,7 @@ proc processItemSetRange*(
 
   if not inputItemSet.reconciled:
     output.ranges.add((inputBounds, RangeType.ItemSet))
-
-    let elements = collect(newSeq):
-      for i in slice:
-        if shardSet.contains(self.shards[i]):
-          self.elements[i]
-
+    let elements = self.getFilteredElements(slice, pubsubTopicSet, contentTopicSet)
     let state = ItemSet(elements: elements, reconciled: true)
     output.itemSets.add(state)
   else:
@@ -270,7 +380,12 @@ proc processItemSetRange*(
 
 method processPayload*(
     self: SeqStorage,
-    input: RangesData,
+    cluster: uint16,
+    pubsubTopics: seq[PubsubTopic],
+    contentTopics: seq[ContentTopic],
+    ranges: seq[(Slice[SyncID], RangeType)],
+    fingerprints: seq[Fingerprint],
+    itemSets: seq[ItemSet],
     hashToSend: var seq[Fingerprint],
     hashToRecv: var seq[Fingerprint],
 ): RangesData {.raises: [].} =
@@ -280,27 +395,39 @@ method processPayload*(
     i = 0
     j = 0
 
-  let shardSet = input.shards.toPackedSet()
+  var pubsubTopicSet = initPackedSet[int]()
+  for inputTopic in pubsubTopics:
+    for i, localTopic in self.pubsubTopics:
+      if inputTopic == localTopic:
+        pubsubTopicSet.incl(i)
 
-  for (bounds, rangeType) in input.ranges:
+  var contentTopicSet = initPackedSet[int]()
+  for inputTopic in contentTopics:
+    for i, localTopic in self.contentTopics:
+      if inputTopic == localTopic:
+        contentTopicSet.incl(i)
+
+  for (bounds, rangeType) in ranges:
     case rangeType
     of RangeType.Skip:
       output.ranges.add((bounds, RangeType.Skip))
 
       continue
     of RangeType.Fingerprint:
-      let fingerprint = input.fingerprints[i]
+      let fingerprint = fingerprints[i]
       i.inc()
 
-      self.processFingerprintRange(bounds, shardSet, fingerprint, output)
+      self.processFingerprintRange(
+        bounds, pubsubTopicSet, contentTopicSet, fingerprint, output
+      )
 
       continue
     of RangeType.ItemSet:
-      let itemSet = input.itemsets[j]
+      let itemSet = itemsets[j]
       j.inc()
 
       self.processItemSetRange(
-        bounds, shardSet, itemSet, hashToSend, hashToRecv, output
+        bounds, pubsubTopicSet, contentTopicSet, itemSet, hashToSend, hashToRecv, output
       )
 
       continue
@@ -340,20 +467,6 @@ method processPayload*(
 proc new*(T: type SeqStorage, capacity: int, threshold = 100, partitions = 8): T =
   return SeqStorage(
     elements: newSeqOfCap[SyncID](capacity),
-    lengthThreshold: threshold,
-    partitionCount: partitions,
-  )
-
-proc new*(
-    T: type SeqStorage,
-    elements: seq[SyncID],
-    shards: seq[uint16],
-    threshold = 100,
-    partitions = 8,
-): T =
-  return SeqStorage(
-    elements: elements,
-    shards: shards,
     lengthThreshold: threshold,
     partitionCount: partitions,
   )

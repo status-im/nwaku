@@ -56,13 +56,13 @@ proc deltaEncode*(value: RangesData): seq[byte] =
   buf = uint64(value.cluster).toBytes(Leb128)
   output &= @buf
 
-  # encode shards
-  buf = uint64(value.shards.len).toBytes(Leb128)
+  # TODO encode topics
+  #[ buf = uint64(value.shards.len).toBytes(Leb128)
   output &= @buf
 
   for shard in value.shards:
     buf = uint64(shard).toBytes(Leb128)
-    output &= @buf
+    output &= @buf ]#
 
   # the first range is implicit but must be explicit when encoded
   let (bound, _) = value.ranges[0]
@@ -231,7 +231,9 @@ proc getCluster(idx: var int, buffer: seq[byte]): Result[uint16, string] =
 
   return ok(uint16(val))
 
-proc getShards(idx: var int, buffer: seq[byte]): Result[seq[uint16], string] =
+#[ proc getShards(idx: var int, buffer: seq[byte]): Result[seq[uint16], string] =
+  #TODO switch to topics
+
   if idx + VarIntLen > buffer.len:
     return err("Cannot decode shards count")
 
@@ -251,7 +253,7 @@ proc getShards(idx: var int, buffer: seq[byte]): Result[seq[uint16], string] =
 
     shards.add(uint16(val))
 
-  return ok(shards)
+  return ok(shards) ]#
 
 proc deltaDecode*(
     itemSet: var ItemSet, buffer: seq[byte], setLength: int
@@ -295,7 +297,8 @@ proc deltaDecode*(T: type RangesData, buffer: seq[byte]): Result[T, string] =
     idx = 0
 
   payload.cluster = ?getCluster(idx, buffer)
-  payload.shards = ?getShards(idx, buffer)
+  #TODO decode topics
+  #payload.shards = ?getShards(idx, buffer)
 
   lastTime = ?getTimestamp(idx, buffer)
 
