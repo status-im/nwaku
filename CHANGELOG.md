@@ -29,7 +29,6 @@
 
 ### Features
 
-- refactor filter to react when the remote peer closes the stream ([#3281](https://github.com/waku-org/nwaku/issues/3281)) ([5392b8ea4](https://github.com/waku-org/nwaku/commit/5392b8ea4))
 - waku sync shard matching check ([#3259](https://github.com/waku-org/nwaku/issues/3259)) ([42fd6b827](https://github.com/waku-org/nwaku/commit/42fd6b827))
 - waku store sync 2.0 config & setup ([#3217](https://github.com/waku-org/nwaku/issues/3217)) ([7f64dc03a](https://github.com/waku-org/nwaku/commit/7f64dc03a))
 - waku store sync 2.0 protocols & tests ([#3216](https://github.com/waku-org/nwaku/issues/3216)) ([6ee494d90](https://github.com/waku-org/nwaku/commit/6ee494d90))
@@ -48,7 +47,6 @@
 
 ### Bug Fixes
 
-- filter enhancements in subscription management ([#3198](https://github.com/waku-org/nwaku/issues/3198)) ([287e9b12c](https://github.com/waku-org/nwaku/commit/287e9b12c))
 - avoid double db migration for sqlite ([#3244](https://github.com/waku-org/nwaku/issues/3244)) ([2ce245354](https://github.com/waku-org/nwaku/commit/2ce245354))
 - libwaku waku_relay_unsubscribe ([#3207](https://github.com/waku-org/nwaku/issues/3207)) ([ab0c1d4aa](https://github.com/waku-org/nwaku/commit/ab0c1d4aa))
 - libwaku support string and int64 for timestamps ([#3205](https://github.com/waku-org/nwaku/issues/3205)) ([2022f54f5](https://github.com/waku-org/nwaku/commit/2022f54f5))
@@ -57,7 +55,10 @@
 
 ### Changes
 
-- filter remove all subscription from a peer that is leaving ([#3267](https://github.com/waku-org/nwaku/issues/3267)) ([46747fd49](https://github.com/waku-org/nwaku/commit/46747fd49))
+- filter refactor subscription management and react when the remote peer closes the stream. See the following commits in chronological order:
+  - issue: [#3281](https://github.com/waku-org/nwaku/issues/3281) commit: [5392b8ea4](https://github.com/waku-org/nwaku/commit/5392b8ea4)
+  - issue: [#3198](https://github.com/waku-org/nwaku/issues/3198) commit: [287e9b12c](https://github.com/waku-org/nwaku/commit/287e9b12c)
+  - issue: [#3267](https://github.com/waku-org/nwaku/issues/3267) commit: [46747fd49](https://github.com/waku-org/nwaku/commit/46747fd49)
 - send msg hash as string on libwaku message event ([#3234](https://github.com/waku-org/nwaku/issues/3234)) ([9c209b4c3](https://github.com/waku-org/nwaku/commit/9c209b4c3))
 - separate heaptrack from debug build ([#3249](https://github.com/waku-org/nwaku/issues/3249)) ([81f24cc25](https://github.com/waku-org/nwaku/commit/81f24cc25))
 - capping mechanism for relay and service connections ([#3184](https://github.com/waku-org/nwaku/issues/3184)) ([2942782f9](https://github.com/waku-org/nwaku/commit/2942782f9))
