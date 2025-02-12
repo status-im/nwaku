@@ -1,6 +1,6 @@
 {.push raises: [].}
 
-import std/sequtils, stew/leb128
+import std/sequtils, stew/[leb128, byteutils]
 
 import ../common/protobuf, ../waku_core/message, ../waku_core/time, ./common
 
@@ -56,13 +56,25 @@ proc deltaEncode*(value: RangesData): seq[byte] =
   buf = uint64(value.cluster).toBytes(Leb128)
   output &= @buf
 
-  # TODO encode topics
-  #[ buf = uint64(value.shards.len).toBytes(Leb128)
+  # encode pubsub topics
+  buf = uint64(value.pubsubTopics.len).toBytes(Leb128)
   output &= @buf
 
-  for shard in value.shards:
-    buf = uint64(shard).toBytes(Leb128)
-    output &= @buf ]#
+  for topic in value.pubsubTopics:
+    buf = uint64(topic.len).toBytes(Leb128)
+    output &= @buf
+
+    output &= topic.toBytes()
+
+  # encode content topics
+  buf = uint64(value.contentTopics.len).toBytes(Leb128)
+  output &= @buf
+
+  for topic in value.contentTopics:
+    buf = uint64(topic.len).toBytes(Leb128)
+    output &= @buf
+
+    output &= topic.toBytes()
 
   # the first range is implicit but must be explicit when encoded
   let (bound, _) = value.ranges[0]
@@ -231,29 +243,34 @@ proc getCluster(idx: var int, buffer: seq[byte]): Result[uint16, string] =
 
   return ok(uint16(val))
 
-#[ proc getShards(idx: var int, buffer: seq[byte]): Result[seq[uint16], string] =
-  #TODO switch to topics
-
+proc getTopics(idx: var int, buffer: seq[byte]): Result[seq[string], string] =
   if idx + VarIntLen > buffer.len:
-    return err("Cannot decode shards count")
+    return err("Cannot decode topic count")
 
   let slice = buffer[idx ..< idx + VarIntLen]
   let (val, len) = uint64.fromBytes(slice, Leb128)
   idx += len
-  let shardsLen = val
+  let topicCount = int(val)
 
-  var shards: seq[uint16]
-  for i in 0 ..< shardsLen:
+  var topics: seq[string]
+  for i in 0 ..< topicCount:
     if idx + VarIntLen > buffer.len:
-      return err("Cannot decode shard value. idx: " & $i)
+      return err("Cannot decode length. Topic index: " & $i)
 
     let slice = buffer[idx ..< idx + VarIntLen]
     let (val, len) = uint64.fromBytes(slice, Leb128)
     idx += len
+    let topicLen = int(val)
 
-    shards.add(uint16(val))
+    if idx + topicLen > buffer.len:
+      return err("Cannot decode bytes. Topic index: " & $i)
 
-  return ok(shards) ]#
+    let topic = string.fromBytes(buffer[idx ..< idx + topicLen])
+    idx += topicLen
+
+    topics.add(topic)
+
+  return ok(topics)
 
 proc deltaDecode*(
     itemSet: var ItemSet, buffer: seq[byte], setLength: int
@@ -297,8 +314,8 @@ proc deltaDecode*(T: type RangesData, buffer: seq[byte]): Result[T, string] =
     idx = 0
 
   payload.cluster = ?getCluster(idx, buffer)
-  #TODO decode topics
-  #payload.shards = ?getShards(idx, buffer)
+  payload.pubsubTopics = ?getTopics(idx, buffer)
+  payload.contentTopics = ?getTopics(idx, buffer)
 
   lastTime = ?getTimestamp(idx, buffer)
 

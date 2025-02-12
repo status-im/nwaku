@@ -189,6 +189,11 @@ proc processRequest(
     if preProcessedPayloadRes.isSome():
       let preProcessedPayload = preProcessedPayloadRes.get()
 
+      trace "pre-processed payload",
+        local = self.peerManager.switch.peerInfo.peerId,
+        remote = conn.peerId,
+        payload = preProcessedPayload
+
       sendPayload = self.storage.processPayload(
         preProcessedPayload.cluster, preProcessedPayload.pubsubTopics,
         preProcessedPayload.contentTopics, preProcessedPayload.ranges,
@@ -270,7 +275,7 @@ proc initiate(
   trace "sync payload sent",
     local = self.peerManager.switch.peerInfo.peerId,
     remote = connection.peerId,
-    payload = sendPayload
+    payload = initPayload
 
   ?await self.processRequest(connection)
 

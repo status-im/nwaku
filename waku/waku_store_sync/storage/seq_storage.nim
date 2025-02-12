@@ -1,5 +1,5 @@
 import
-  std/[algorithm, sequtils, math, options, packedsets, sugar],
+  std/[algorithm, sequtils, math, options, tables, packedsets, sugar],
   results,
   chronos,
   stew/arrayops
@@ -177,10 +177,10 @@ proc computefingerprintFromSlice(
     let pubsub = pubsubSlice[i]
     let content = contentSlice[i]
 
-    if pubsub notin pubsubTopicSet:
+    if pubsubTopicSet.len > 0 and pubsub notin pubsubTopicSet:
       continue
 
-    if content notin contentTopicSet:
+    if contentTopicSet.len > 0 and content notin contentTopicSet:
       continue
 
     fingerprint = fingerprint xor id.hash
@@ -467,6 +467,46 @@ method processPayload*(
 proc new*(T: type SeqStorage, capacity: int, threshold = 100, partitions = 8): T =
   return SeqStorage(
     elements: newSeqOfCap[SyncID](capacity),
+    lengthThreshold: threshold,
+    partitionCount: partitions,
+  )
+
+proc new*(
+    T: type SeqStorage,
+    elements: seq[SyncID],
+    pubsubTopics: seq[PubsubTopic],
+    contentTopics: seq[ContentTopic],
+    threshold = 100,
+    partitions = 8,
+): T =
+  var idx = 0
+  var uniquePubsubTopics = initOrderedTable[PubsubTopic, int]()
+  for pubsub in pubsubTopics:
+    if pubsub notin uniquePubsubTopics:
+      uniquePubsubTopics.add(pubsub, idx)
+      idx.inc()
+
+  let pubsubTopicIndexes = collect(newSeq):
+    for pubsub in pubsubTopics:
+      uniquePubsubTopics[pubsub]
+
+  idx = 0
+  var uniqueContentTopics = initOrderedTable[ContentTopic, int]()
+  for content in contentTopics:
+    if content notin uniqueContentTopics:
+      uniqueContentTopics.add(content, idx)
+      idx.inc()
+
+  let contentTopicIndexes = collect(newSeq):
+    for content in contentTopics:
+      uniqueContentTopics[content]
+
+  return SeqStorage(
+    elements: elements,
+    pubsubTopics: uniquePubsubTopics.keys.toSeq(),
+    contentTopics: uniqueContentTopics.keys.toSeq(),
+    pubsubTopicIndexes: pubsubTopicIndexes,
+    contentTopicIndexes: contentTopicIndexes,
     lengthThreshold: threshold,
     partitionCount: partitions,
   )
