@@ -19,6 +19,23 @@ suite "Waku Incentivization PoC Reputation":
   ## TODO: think how to reuse existing peer scoring.
   ## TODO: think how to test reputation without integration with an actual protocol.
 
+  var manager {.threadvar.}: ReputationManager
+
+  setup:
+    manager = ReputationManager.init()
+
   test "incentivization PoC: reputation: reputation table is empty after initialization":
-    let manager = ReputationManager.init()
     check manager.peerReputation.len == 0
+
+  test "incentivization PoC: reputation: set and get reputation":
+    manager.setReputation("peer1", true)
+    check manager.getReputation("peer1") == true
+
+  test "incentivization PoC: reputation: evaluate response":
+    let response = DummyResponse(peerId: "peer1", responseQuality: true)
+    check evaluateResponse(response) == true
+
+  test "incentivization PoC: reputation: update reputation with response":
+    let response = DummyResponse(peerId: "peer1", responseQuality: true)
+    manager.updateReputation(response)
+    check manager.getReputation("peer1") == true
