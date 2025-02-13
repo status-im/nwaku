@@ -334,13 +334,6 @@ hence would have reachability issues.""",
       name: "num-shards-in-network"
     .}: uint32
 
-    pubsubTopics* {.
-      desc:
-        "Deprecated. Default pubsub topic to subscribe to. Argument may be repeated.",
-      defaultValue: @[],
-      name: "pubsub-topic"
-    .}: seq[string]
-
     shards* {.
       desc:
         "Shards index to subscribe to [0..NUM_SHARDS_IN_NETWORK-1]. Argument may be repeated.",
