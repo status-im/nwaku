@@ -1,6 +1,6 @@
 {.used.}
 
-import std/[options, random], testutils/unittests, chronos
+import std/[options, random, sequtils, packedsets], testutils/unittests, chronos
 
 import
   ../../waku/waku_core,
@@ -14,23 +14,32 @@ suite "Waku Sync Storage":
     var rng = initRand()
     let count = 10_000
     var elements = newSeqOfCap[SyncID](count)
+    var pubsub = newSeqOfCap[PubsubTopic](count)
+    var content = newSeqOfCap[ContentTopic](count)
+
+    var emptySet = @[0].toPackedSet()
+    emptySet.excl(0)
 
     for i in 0 ..< count:
       let id = SyncID(time: Timestamp(i), hash: randomHash(rng))
 
       elements.add(id)
+      pubsub.add(DefaultPubsubTopic)
+      content.add(DefaultContentTopic)
 
-    var storage1 = SeqStorage.new(elements)
-    var storage2 = SeqStorage.new(elements)
+    var storage1 = SeqStorage.new(elements, pubsub, content)
+    var storage2 = SeqStorage.new(elements, pubsub, content)
 
     let lb = elements[0]
     let ub = elements[count - 1]
     let bounds = lb .. ub
-    let fingerprint1 = storage1.computeFingerprint(bounds)
+    let fingerprint1 = storage1.computeFingerprint(bounds, @[], @[])
 
     var outputPayload: RangesData
 
-    storage2.processFingerprintRange(bounds, fingerprint1, outputPayload)
+    storage2.processFingerprintRange(
+      bounds, emptySet, emptySet, fingerprint1, outputPayload
+    )
 
     let expected =
       RangesData(ranges: @[(bounds, RangeType.Skip)], fingerprints: @[], itemSets: @[])
@@ -43,6 +52,12 @@ suite "Waku Sync Storage":
     let count = 1000
     var elements1 = newSeqOfCap[SyncID](count)
     var elements2 = newSeqOfCap[SyncID](count)
+    var pubsub = newSeqOfCap[PubsubTopic](count)
+    var content = newSeqOfCap[ContentTopic](count)
+
+    var emptySet = @[0].toPackedSet()
+    emptySet.excl(0)
+
     var diffs: seq[Fingerprint]
 
     for i in 0 ..< count:
@@ -54,7 +69,10 @@ suite "Waku Sync Storage":
       else:
         diffs.add(id.hash)
 
-    var storage1 = SeqStorage.new(elements1)
+      pubsub.add(DefaultPubsubTopic)
+      content.add(DefaultContentTopic)
+
+    var storage1 = SeqStorage.new(elements1, pubsub, content)
 
     let lb = elements1[0]
     let ub = elements1[count - 1]
@@ -67,7 +85,9 @@ suite "Waku Sync Storage":
       toRecv: seq[Fingerprint]
       outputPayload: RangesData
 
-    storage1.processItemSetRange(bounds, itemSet2, toSend, toRecv, outputPayload)
+    storage1.processItemSetRange(
+      bounds, emptySet, emptySet, itemSet2, toSend, toRecv, outputPayload
+    )
 
     check:
       toSend == diffs
@@ -80,11 +100,11 @@ suite "Waku Sync Storage":
     let element1 = SyncID(time: Timestamp(1000), hash: randomHash(rng))
     let element2 = SyncID(time: Timestamp(2000), hash: randomHash(rng))
 
-    let res1 = storage.insert(element1)
+    let res1 = storage.insert(element1, DefaultPubsubTopic, DefaultContentTopic)
     assert res1.isOk(), $res1.error
     let count1 = storage.length()
 
-    let res2 = storage.insert(element2)
+    let res2 = storage.insert(element2, DefaultPubsubTopic, DefaultContentTopic)
     assert res2.isOk(), $res2.error
     let count2 = storage.length()
 
@@ -97,9 +117,10 @@ suite "Waku Sync Storage":
 
     let element = SyncID(time: Timestamp(1000), hash: randomHash(rng))
 
-    let storage = SeqStorage.new(@[element])
+    let storage =
+      SeqStorage.new(@[element], @[DefaultPubsubTopic], @[DefaultContentTopic])
 
-    let res = storage.insert(element)
+    let res = storage.insert(element, DefaultPubsubTopic, DefaultContentTopic)
 
     check:
       res.isErr() == true
@@ -108,13 +129,20 @@ suite "Waku Sync Storage":
     var rng = initRand()
     let count = 1000
     var elements = newSeqOfCap[SyncID](count)
+    var pubsub = newSeqOfCap[PubsubTopic](count)
+    var content = newSeqOfCap[ContentTopic](count)
+
+    var emptySet = @[0].toPackedSet()
+    emptySet.excl(0)
 
     for i in 0 ..< count:
       let id = SyncID(time: Timestamp(i), hash: randomHash(rng))
 
       elements.add(id)
+      pubsub.add(DefaultPubsubTopic)
+      content.add(DefaultContentTopic)
 
-    let storage = SeqStorage.new(elements)
+    let storage = SeqStorage.new(elements, pubsub, content)
 
     let beforeCount = storage.length()
 

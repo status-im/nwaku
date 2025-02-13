@@ -399,7 +399,8 @@ proc setupProtocols(
   if conf.storeSync:
     (
       await node.mountStoreSync(
-        conf.storeSyncRange, conf.storeSyncInterval, conf.storeSyncRelayJitter
+        conf.clusterId, conf.shards, conf.contentTopics, conf.storeSyncRange,
+        conf.storeSyncInterval, conf.storeSyncRelayJitter,
       )
     ).isOkOr:
       return err("failed to mount waku store sync protocol: " & $error)
