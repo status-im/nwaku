@@ -65,8 +65,7 @@ proc decodeFromJsonBytes*[T](
       )
     )
   except SerializationError:
-    # TODO: Do better error reporting here
-    err("Unable to deserialize data")
+    err("Unable to deserialize data: " & getCurrentExceptionMsg())
 
 proc encodeIntoJsonString*(value: auto): SerdesResult[string] =
   var encoded: string

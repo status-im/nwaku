@@ -17,6 +17,7 @@ type RelayWakuMessage* = object
   timestamp*: Option[int64]
   meta*: Option[Base64String]
   ephemeral*: Option[bool]
+  proof*: Option[Base64String]
 
 type
   RelayGetMessagesResponse* = seq[RelayWakuMessage]
@@ -36,6 +37,7 @@ proc toRelayWakuMessage*(msg: WakuMessage): RelayWakuMessage =
       else:
         none(Base64String),
     ephemeral: some(msg.ephemeral),
+    proof: some(base64.encode(msg.proof)),
   )
 
 proc toWakuMessage*(msg: RelayWakuMessage, version = 0): Result[WakuMessage, string] =
@@ -45,6 +47,7 @@ proc toWakuMessage*(msg: RelayWakuMessage, version = 0): Result[WakuMessage, str
     version = uint32(msg.version.get(version))
     meta = ?msg.meta.get(Base64String("")).decode()
     ephemeral = msg.ephemeral.get(false)
+    proof = ?msg.proof.get(Base64String("")).decode()
 
   var timestamp = msg.timestamp.get(0)
 
@@ -59,6 +62,7 @@ proc toWakuMessage*(msg: RelayWakuMessage, version = 0): Result[WakuMessage, str
       timestamp: timestamp,
       meta: meta,
       ephemeral: ephemeral,
+      proof: proof,
     )
   )
 
@@ -79,6 +83,8 @@ proc writeValue*(
     writer.writeField("meta", value.meta.get())
   if value.ephemeral.isSome():
     writer.writeField("ephemeral", value.ephemeral.get())
+  if value.proof.isSome():
+    writer.writeField("proof", value.proof.get())
   writer.endRecord()
 
 proc readValue*(
@@ -91,6 +97,7 @@ proc readValue*(
     timestamp = none(int64)
     meta = none(Base64String)
     ephemeral = none(bool)
+    proof = none(Base64String)
 
   var keys = initHashSet[string]()
   for fieldName in readObjectFields(reader):
@@ -116,6 +123,8 @@ proc readValue*(
       meta = some(reader.readValue(Base64String))
     of "ephemeral":
       ephemeral = some(reader.readValue(bool))
+    of "proof":
+      proof = some(reader.readValue(Base64String))
     else:
       unrecognizedFieldWarning(value)
 
@@ -132,4 +141,5 @@ proc readValue*(
     timestamp: timestamp,
     meta: meta,
     ephemeral: ephemeral,
+    proof: proof,
   )

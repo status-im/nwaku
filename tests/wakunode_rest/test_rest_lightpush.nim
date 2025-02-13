@@ -96,6 +96,29 @@ proc shutdown(self: RestLightPushTest) {.async.} =
   await allFutures(self.serviceNode.stop(), self.pushNode.stop())
 
 suite "Waku v2 Rest API - lightpush":
+  asyncTest "Push message with proof":
+    let restLightPushTest = await RestLightPushTest.init()
+
+    let message: RelayWakuMessage = fakeWakuMessage(
+        contentTopic = DefaultContentTopic,
+        payload = toBytes("TEST-1"),
+        proof = toBytes("proof-test"),
+      )
+      .toRelayWakuMessage()
+
+    check message.proof.isSome()
+
+    let requestBody =
+      PushRequest(pubsubTopic: some(DefaultPubsubTopic), message: message)
+
+    let response = await restLightPushTest.client.sendPushRequest(body = requestBody)
+
+    ## Validate that the push request failed because the node is not
+    ## connected to other node but, doesn't fail because of not properly
+    ## handling the proof message attribute within the REST request.
+    check:
+      response.data == "Failed to request a message push: not_published_to_any_peer"
+
   asyncTest "Push message request":
     # Given
     let restLightPushTest = await RestLightPushTest.init()

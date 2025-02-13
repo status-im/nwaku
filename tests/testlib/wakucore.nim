@@ -50,6 +50,7 @@ proc fakeWakuMessage*(
     meta: string | seq[byte] = newSeq[byte](),
     ts = now(),
     ephemeral = false,
+    proof = newSeq[byte](),
 ): WakuMessage =
   var payloadBytes: seq[byte]
   var metaBytes: seq[byte]
@@ -71,4 +72,5 @@ proc fakeWakuMessage*(
     version: 2,
     timestamp: ts,
     ephemeral: ephemeral,
+    proof: proof,
   )
