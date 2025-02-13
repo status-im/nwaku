@@ -12,8 +12,9 @@ declarePublicGauge waku_store_time_seconds,
 
 # Error types (metric label values)
 const
-  dialFailure* = "dial_failure"
-  decodeRpcFailure* = "decode_rpc_failure"
-  peerNotFoundFailure* = "peer_not_found_failure"
-  emptyRpcQueryFailure* = "empty_rpc_query_failure"
-  emptyRpcResponseFailure* = "empty_rpc_response_failure"
+  DialFailure* = "dial_failure"
+  DecodeRpcFailure* = "decode_rpc_failure"
+  PeerNotFoundFailure* = "peer_not_found_failure"
+  EmptyRpcQueryFailure* = "empty_rpc_query_failure"
+  EmptyRpcResponseFailure* = "empty_rpc_response_failure"
+  NoSuccessStatusCode* = "status_code_no_success"

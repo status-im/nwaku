@@ -39,11 +39,11 @@ proc sendStoreRequest(
     return err(StoreError(kind: ErrorCode.BAD_RESPONSE, cause: error.msg))
 
   let res = StoreQueryResponse.decode(buf).valueOr:
-    waku_store_errors.inc(labelValues = [decodeRpcFailure])
-    return err(StoreError(kind: ErrorCode.BAD_RESPONSE, cause: decodeRpcFailure))
+    waku_store_errors.inc(labelValues = [DecodeRpcFailure])
+    return err(StoreError(kind: ErrorCode.BAD_RESPONSE, cause: DecodeRpcFailure))
 
   if res.statusCode != uint32(StatusCode.SUCCESS):
-    waku_store_errors.inc(labelValues = [res.statusDesc])
+    waku_store_errors.inc(labelValues = [NoSuccessStatusCode])
     return err(StoreError.new(res.statusCode, res.statusDesc))
 
   return ok(res)
@@ -55,7 +55,7 @@ proc query*(
     return err(StoreError(kind: ErrorCode.BAD_REQUEST, cause: "invalid cursor"))
 
   let connection = (await self.peerManager.dialPeer(peer, WakuStoreCodec)).valueOr:
-    waku_store_errors.inc(labelValues = [dialFailure])
+    waku_store_errors.inc(labelValues = [DialFailure])
 
     return err(StoreError(kind: ErrorCode.PEER_DIAL_FAILURE, address: $peer))
 
@@ -74,7 +74,7 @@ proc queryToAny*(
     return err(StoreError(kind: BAD_RESPONSE, cause: "no service store peer connected"))
 
   let connection = (await self.peerManager.dialPeer(peer, WakuStoreCodec)).valueOr:
-    waku_store_errors.inc(labelValues = [dialFailure])
+    waku_store_errors.inc(labelValues = [DialFailure])
 
     return err(StoreError(kind: ErrorCode.PEER_DIAL_FAILURE, address: $peer))
 

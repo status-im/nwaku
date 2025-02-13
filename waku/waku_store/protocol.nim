@@ -45,7 +45,7 @@ proc handleQueryRequest(
 
   let req = StoreQueryRequest.decode(raw_request).valueOr:
     error "failed to decode rpc", peerId = requestor, error = $error
-    waku_store_errors.inc(labelValues = [decodeRpcFailure])
+    waku_store_errors.inc(labelValues = [DecodeRpcFailure])
 
     res.statusCode = uint32(ErrorCode.BAD_REQUEST)
     res.statusDesc = "decoding rpc failed: " & $error
