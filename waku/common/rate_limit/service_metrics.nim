@@ -17,3 +17,6 @@ proc setServiceLimitMetric*(service: string, limit: Option[RateLimitSetting]) =
     waku_service_requests_limit.set(
       limit.get().calculateLimitPerSecond(), labelValues = [service]
     )
+
+declarePublicHistogram waku_service_request_handling_duration_seconds,
+  "duration of non-relay service handling", ["service"]
